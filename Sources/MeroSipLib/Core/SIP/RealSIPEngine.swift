@@ -34,6 +34,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
     private var incomingCSeqLine: String?
     private var incomingRemoteRTPHost: String?
     private var incomingRemoteRTPPort: UInt16?
+    private var incomingNegotiatedCodec: AudioCodec = .opus
     
     private var keepAliveTimer: Task<Void, Never>?
     private var durationTimer: Task<Void, Never>?
@@ -186,7 +187,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         
         let host = incomingRemoteRTPHost ?? account?.domain ?? "127.0.0.1"
         let port = incomingRemoteRTPPort ?? 10000
-        RTPAudioEngine.shared.startRTP(remoteHost: host, remotePort: port)
+        RTPAudioEngine.shared.startRTP(remoteHost: host, remotePort: port, codec: incomingNegotiatedCodec)
         
         startDurationTicker(callId: callId)
     }
@@ -312,7 +313,9 @@ public final class RealSIPEngine: SIPServiceProtocol {
                   "s=pjmedia\r\n" +
                   "c=IN IP4 \(connIP)\r\n" +
                   "t=0 0\r\n" +
-                  "m=audio \(localRTP) RTP/AVP 0 8 101\r\n" +
+                  "m=audio \(localRTP) RTP/AVP 111 0 8 101\r\n" +
+                  "a=rtpmap:111 opus/48000/2\r\n" +
+                  "a=fmtp:111 useinbandfec=1; minptime=10\r\n" +
                   "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:8 PCMA/8000\r\n" +
                   "a=rtpmap:101 telephone-event/8000\r\n" +
@@ -364,7 +367,9 @@ public final class RealSIPEngine: SIPServiceProtocol {
                   "s=pjmedia\r\n" +
                   "c=IN IP4 \(localIP)\r\n" +
                   "t=0 0\r\n" +
-                  "m=audio \(localRTP) RTP/AVP 0 8 101\r\n" +
+                  "m=audio \(localRTP) RTP/AVP 111 0 8 101\r\n" +
+                  "a=rtpmap:111 opus/48000/2\r\n" +
+                  "a=fmtp:111 useinbandfec=1; minptime=10\r\n" +
                   "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:8 PCMA/8000\r\n" +
                   "a=rtpmap:101 telephone-event/8000\r\n" +
@@ -613,7 +618,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
                             
                             let host = incomingRemoteRTPHost ?? account?.domain ?? "127.0.0.1"
                             let port = incomingRemoteRTPPort ?? 10000
-                            RTPAudioEngine.shared.startRTP(remoteHost: host, remotePort: port)
+                            RTPAudioEngine.shared.startRTP(remoteHost: host, remotePort: port, codec: incomingNegotiatedCodec)
                             
                             startDurationTicker(callId: session.callId)
                         } else {
@@ -747,7 +752,12 @@ public final class RealSIPEngine: SIPServiceProtocol {
     }
     
     private func parseRemoteSDP(lines: [String]) {
+        var foundOpus = false
+        var foundPCMA = false
+        var foundPCMU = false
+        
         for line in lines {
+            let lower = line.lowercased()
             if line.hasPrefix("c=IN IP4 ") {
                 let parts = line.components(separatedBy: " ")
                 if parts.count >= 3 {
@@ -758,9 +768,28 @@ public final class RealSIPEngine: SIPServiceProtocol {
                 if parts.count >= 2, let port = UInt16(parts[1]) {
                     self.incomingRemoteRTPPort = port
                 }
+            } else if lower.contains("rtpmap:") {
+                if lower.contains("opus/48000") {
+                    foundOpus = true
+                } else if lower.contains("pcma/8000") {
+                    foundPCMA = true
+                } else if lower.contains("pcmu/8000") {
+                    foundPCMU = true
+                }
             }
         }
-        print("[SIP Engine] Parsed Asterisk RTP Endpoint: \(incomingRemoteRTPHost ?? "none"):\(incomingRemoteRTPPort ?? 0)")
+        
+        if foundOpus {
+            self.incomingNegotiatedCodec = .opus
+        } else if foundPCMA {
+            self.incomingNegotiatedCodec = .pcma
+        } else if foundPCMU {
+            self.incomingNegotiatedCodec = .pcmu
+        } else {
+            self.incomingNegotiatedCodec = .opus
+        }
+        
+        print("[SIP Engine] Parsed Asterisk RTP Endpoint: \(incomingRemoteRTPHost ?? "none"):\(incomingRemoteRTPPort ?? 0) | Codec: [\(incomingNegotiatedCodec.name)]")
     }
     
     private func handleDigestChallenge(lines: [String], method: String) {

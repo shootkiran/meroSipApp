@@ -44,8 +44,9 @@ public final class MeroSipAppDelegate: NSObject, NSApplicationDelegate, NSWindow
     }
     
     public static func revealAndFloatMainWindow() {
-        NSApp.activate(ignoringOtherApps: true)
-        let targetWindow = mainWindow ?? NSApp.windows.first(where: { !$0.className.contains("NSStatusBarWindow") })
+        let app = NSApplication.shared
+        app.activate(ignoringOtherApps: true)
+        let targetWindow = mainWindow ?? app.windows.first(where: { !$0.className.contains("NSStatusBarWindow") })
         if let window = targetWindow {
             window.setIsVisible(true)
             if window.isMiniaturized {
@@ -58,7 +59,7 @@ public final class MeroSipAppDelegate: NSObject, NSApplicationDelegate, NSWindow
     }
     
     public static func restoreNormalWindowLevel() {
-        for window in NSApp.windows where !window.className.contains("NSStatusBarWindow") {
+        for window in NSApplication.shared.windows where !window.className.contains("NSStatusBarWindow") {
             window.level = .normal
         }
     }
