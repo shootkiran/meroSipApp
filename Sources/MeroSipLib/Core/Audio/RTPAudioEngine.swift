@@ -14,6 +14,9 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
     private var sampleBuffer: [Float] = []
     private let lock = os_unfair_lock_t.allocate(capacity: 1)
     
+    private var packetCount: Int = 0
+    private var recentMaxVolume: Float = 0.0
+    
     init() {
         lock.initialize(to: os_unfair_lock())
     }
@@ -33,13 +36,20 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
         let step = sampleRate / 8000.0
         
         var resampled: [Float] = []
+        resampled.reserveCapacity(Int(Double(frameCount) / step) + 2)
+        
         var pos = 0.0
+        var maxAmp: Float = 0.0
         while Int(pos) < frameCount {
-            resampled.append(channel[Int(pos)])
+            let sample = channel[Int(pos)]
+            let absSample = abs(sample)
+            if absSample > maxAmp { maxAmp = absSample }
+            resampled.append(sample)
             pos += step
         }
         
         os_unfair_lock_lock(lock)
+        if maxAmp > recentMaxVolume { recentMaxVolume = maxAmp }
         sampleBuffer.append(contentsOf: resampled)
         
         while sampleBuffer.count >= 160 {
@@ -76,32 +86,50 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
         packet[10] = UInt8((ssrc >> 8) & 0xFF)
         packet[11] = UInt8(ssrc & 0xFF)
         
-        // Encode samples to G.711u
+        // Encode samples to standard ITU-T G.711u
         for i in 0..<samples.count {
-            packet[12 + i] = encodeMuLaw(samples[i])
+            packet[12 + i] = RealtimeAudioProcessor.linearToMuLaw(samples[i])
+        }
+        
+        packetCount += 1
+        if packetCount % 50 == 0 {
+            // Periodic activity check
+            let vol = recentMaxVolume
+            recentMaxVolume = 0.0
+            print("[RTP Audio] Mic transmitting: \(packetCount) pkts sent (Mic peak amp: \(String(format: "%.3f", vol)))")
         }
         
         onEncodedRTPPacket?(packet)
     }
     
-    nonisolated func encodeMuLaw(_ sample: Float) -> UInt8 {
+    /// Standard ITU-T G.711 linear to mu-law encoder
+    nonisolated static func linearToMuLaw(_ sample: Float) -> UInt8 {
         let clamped = max(-1.0, min(1.0, sample))
-        var pcm = Int16(clamped * 32767.0)
+        var pcm = Int(clamped * 32767.0)
         
-        let sign = (pcm < 0) ? 0x80 : 0
-        if pcm < 0 { pcm = -pcm }
-        pcm = min(pcm + 132, 32767)
+        let mask: Int
+        if pcm < 0 {
+            pcm = -pcm
+            mask = 0x7F
+        } else {
+            mask = 0xFF
+        }
+        
+        // Clip to maximum allowed range
+        if pcm > 32635 { pcm = 32635 }
+        pcm += 0x84
         
         var exponent = 7
         for exp in 0..<8 {
-            if pcm <= (1 << (exp + 7)) - 1 {
+            if pcm <= (0x84 + (0xFF << exp)) {
                 exponent = exp
                 break
             }
         }
+        
         let mantissa = (pcm >> (exponent + 3)) & 0x0F
-        let ulaw = ~(UInt8(sign) | UInt8(exponent << 4) | UInt8(mantissa))
-        return ulaw
+        let ulaw = (exponent << 4) | mantissa
+        return UInt8(ulaw ^ mask)
     }
 }
 
@@ -124,6 +152,15 @@ public final class RTPAudioEngine: ObservableObject {
     
     public init() {
         self.localRTPPort = UInt16.random(in: 40000...50000) & ~1 // Even port for RTP
+        
+        // Request microphone access early
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            if granted {
+                print("[RTP Audio] Microphone access granted.")
+            } else {
+                print("[RTP Audio] WARNING: Microphone access denied by user or macOS permissions.")
+            }
+        }
     }
     
     public func startRTP(remoteHost: String, remotePort: UInt16) {
@@ -137,7 +174,7 @@ public final class RTPAudioEngine: ObservableObject {
         let processor = RealtimeAudioProcessor()
         self.audioProcessor = processor
         
-        // 1. Setup UDP Connection to Asterisk RTP port
+        // Setup UDP Connection to Asterisk RTP port
         let host = NWEndpoint.Host(remoteHost)
         let port = NWEndpoint.Port(rawValue: remotePort) ?? .init(integerLiteral: 10000)
         
@@ -148,7 +185,11 @@ public final class RTPAudioEngine: ObservableObject {
         self.rtpConnection = conn
         
         processor.onEncodedRTPPacket = { [weak conn] packetData in
-            conn?.send(content: packetData, completion: .contentProcessed { _ in })
+            conn?.send(content: packetData, completion: .contentProcessed { error in
+                if let error = error {
+                    print("[RTP Audio] RTP send error: \(error)")
+                }
+            })
         }
         
         conn.stateUpdateHandler = { [weak self] state in
@@ -163,7 +204,7 @@ public final class RTPAudioEngine: ObservableObject {
             }
         }
         
-        conn.start(queue: .global())
+        conn.start(queue: .global(qos: .userInteractive))
     }
     
     public func stopRTP() {
@@ -198,13 +239,15 @@ public final class RTPAudioEngine: ObservableObject {
             engine.connect(player, to: mixer, format: nil)
         }
         
+        // Microphone Input Configuration
         let inputNode = engine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
+        let inputFormat = inputNode.inputFormat(forBus: 0)
         
-        if inputFormat.sampleRate > 0 && inputFormat.channelCount > 0, let processor = audioProcessor {
+        if let processor = audioProcessor {
             inputNode.removeTap(onBus: 0)
-            RTPAudioEngine.installMicTap(on: inputNode, format: inputFormat, processor: processor)
-            print("[RTP Audio] Mic tap installed with format: \(inputFormat.sampleRate)Hz, \(inputFormat.channelCount)ch")
+            let tapFormat = (inputFormat.sampleRate > 0 && inputFormat.channelCount > 0) ? inputFormat : nil
+            RTPAudioEngine.installMicTap(on: inputNode, format: tapFormat, processor: processor)
+            print("[RTP Audio] Mic tap installed on input bus 0 with format: \(inputFormat.sampleRate)Hz, \(inputFormat.channelCount)ch")
         }
         
         engine.prepare()
@@ -214,13 +257,13 @@ public final class RTPAudioEngine: ObservableObject {
             player.play()
             self.audioEngine = engine
             self.playerNode = player
-            print("[RTP Audio] AVAudioEngine started successfully.")
+            print("[RTP Audio] AVAudioEngine started successfully (Microphone active & Player running).")
         } catch {
             print("[RTP Audio] Failed to start AVAudioEngine: \(error)")
         }
     }
     
-    nonisolated private static func installMicTap(on inputNode: AVAudioNode, format: AVAudioFormat, processor: RealtimeAudioProcessor) {
+    nonisolated private static func installMicTap(on inputNode: AVAudioNode, format: AVAudioFormat?, processor: RealtimeAudioProcessor) {
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
             processor.handleInputBuffer(buffer)
         }
@@ -293,12 +336,13 @@ public final class RTPAudioEngine: ObservableObject {
         }
     }
     
+    /// Standard ITU-T G.711 mu-law to linear float decoder
     private func decodeMuLaw(_ uLawByte: UInt8) -> Float {
         let ulaw = ~Int(uLawByte)
         let sign = (ulaw & 0x80) != 0 ? -1 : 1
         let exponent = (ulaw >> 4) & 0x07
         let mantissa = ulaw & 0x0F
-        let sample = sign * ((mantissa << (exponent + 3)) + (0x84 << exponent) - 0x84)
+        let sample = sign * (((mantissa << 3) + 0x84) << exponent - 0x84)
         return Float(sample) / 32768.0
     }
 }

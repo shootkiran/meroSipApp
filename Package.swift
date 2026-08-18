@@ -26,7 +26,8 @@ let package = Package(
         .executableTarget(
             name: "MeroSipApp",
             dependencies: ["MeroSipLib"],
-            path: "Sources/MeroSipApp"
+            path: "Sources/MeroSipApp",
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "MeroSipTests",
