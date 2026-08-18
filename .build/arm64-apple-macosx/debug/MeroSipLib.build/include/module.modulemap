@@ -1,0 +1,3 @@
+module MeroSipLib {
+    header "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/include/MeroSipLib-Swift.h"
+}

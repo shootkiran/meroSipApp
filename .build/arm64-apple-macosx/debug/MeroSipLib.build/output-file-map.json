@@ -1,0 +1,278 @@
+{
+  "": {
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/primary.swiftdeps"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/App/AppDelegate.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppDelegate.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppDelegate.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppDelegate~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppDelegate.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppDelegate.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/App/AppEnvironment.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppEnvironment.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppEnvironment.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppEnvironment~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppEnvironment.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppEnvironment.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/Audio/AudioRouteManager.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRouteManager.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRouteManager.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRouteManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRouteManager.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRouteManager.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/CallKit/CallKitCoordinator.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallKitCoordinator.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallKitCoordinator.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallKitCoordinator~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallKitCoordinator.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallKitCoordinator.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/CallKit/PushKitHandler.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PushKitHandler.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PushKitHandler.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PushKitHandler~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PushKitHandler.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PushKitHandler.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/Managers/CallManager.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallManager.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallManager.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallManager.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallManager.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/Models/AudioRoute.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRoute.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRoute.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRoute~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRoute.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AudioRoute.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/Models/CallSession.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallSession.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallSession.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallSession~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallSession.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallSession.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/Models/CallState.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallState.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallState.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallState~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallState.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallState.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/Models/SIPAccount.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPAccount.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPAccount.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPAccount~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPAccount.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPAccount.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/Models/TransferType.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferType.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferType.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferType~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferType.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferType.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/SIP/MockSIPService.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MockSIPService.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MockSIPService.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MockSIPService~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MockSIPService.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MockSIPService.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/SIP/PJSIPEngineManager.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PJSIPEngineManager.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PJSIPEngineManager.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PJSIPEngineManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PJSIPEngineManager.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/PJSIPEngineManager.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Core/SIP/SIPServiceProtocol.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPServiceProtocol.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPServiceProtocol.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPServiceProtocol~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPServiceProtocol.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SIPServiceProtocol.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Data/Models/AuthUser.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthUser.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthUser.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthUser~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthUser.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthUser.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Data/Models/CallRecord.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallRecord.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallRecord.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallRecord~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallRecord.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallRecord.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Data/Models/CloudContact.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CloudContact.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CloudContact.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CloudContact~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CloudContact.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CloudContact.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Data/Services/AuthService.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthService.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthService.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthService~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthService.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AuthService.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Data/Services/ContactsService.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsService.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsService.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsService~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsService.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsService.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Data/Services/KeychainManager.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeychainManager.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeychainManager.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeychainManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeychainManager.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeychainManager.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/Data/Storage/CallHistoryRepository.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallHistoryRepository.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallHistoryRepository.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallHistoryRepository~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallHistoryRepository.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/CallHistoryRepository.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Components/DTMFKeypadSheet.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DTMFKeypadSheet.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DTMFKeypadSheet.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DTMFKeypadSheet~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DTMFKeypadSheet.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DTMFKeypadSheet.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Components/StatusBadge.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/StatusBadge.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/StatusBadge.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/StatusBadge~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/StatusBadge.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/StatusBadge.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Components/WaveformView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/WaveformView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/WaveformView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/WaveformView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/WaveformView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/WaveformView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Navigation/AppRootView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppRootView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppRootView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppRootView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppRootView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/AppRootView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Navigation/MainSidebarView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainSidebarView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainSidebarView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainSidebarView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainSidebarView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainSidebarView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Navigation/MainTabView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainTabView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainTabView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainTabView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainTabView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MainTabView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/Auth/LoginView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/LoginView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/LoginView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/LoginView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/LoginView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/LoginView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/Contacts/ContactDetailView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactDetailView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactDetailView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactDetailView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactDetailView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactDetailView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/Contacts/ContactsView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/ContactsView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/InCall/InCallControlsView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallControlsView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallControlsView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallControlsView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallControlsView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallControlsView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/InCall/InCallView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/InCallView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/InCall/TransferSheetView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferSheetView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferSheetView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferSheetView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferSheetView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/TransferSheetView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/Keypad/DialpadButton.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DialpadButton.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DialpadButton.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DialpadButton~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DialpadButton.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/DialpadButton.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/Keypad/KeypadView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeypadView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeypadView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeypadView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeypadView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/KeypadView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/Recents/RecentsRowView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsRowView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsRowView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsRowView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsRowView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsRowView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/Recents/RecentsView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/RecentsView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/Settings/SettingsView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SettingsView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SettingsView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SettingsView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SettingsView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/SettingsView.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Sources/MeroSipLib/UI/Screens/macOS/MenuBarStatusItemView.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MenuBarStatusItemView.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MenuBarStatusItemView.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MenuBarStatusItemView~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MenuBarStatusItemView.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipLib.build/MenuBarStatusItemView.dia"
+  }
+}

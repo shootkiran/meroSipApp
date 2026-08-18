@@ -1,0 +1,26 @@
+{
+  "": {
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/primary.swiftdeps"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Tests/MeroSipTests/AuthServiceTests.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/AuthServiceTests.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/AuthServiceTests.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/AuthServiceTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/AuthServiceTests.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/AuthServiceTests.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Tests/MeroSipTests/CallHistoryTests.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallHistoryTests.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallHistoryTests.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallHistoryTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallHistoryTests.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallHistoryTests.dia"
+  },
+  "/Users/kiran/Development/Mac Apps/MeroVoip/Tests/MeroSipTests/CallManagerTests.swift": {
+    "dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallManagerTests.d",
+    "object": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallManagerTests.swift.o",
+    "swiftmodule": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallManagerTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallManagerTests.swiftdeps",
+    "diagnostics": "/Users/kiran/Development/Mac Apps/MeroVoip/.build/arm64-apple-macosx/debug/MeroSipTests.build/CallManagerTests.dia"
+  }
+}
