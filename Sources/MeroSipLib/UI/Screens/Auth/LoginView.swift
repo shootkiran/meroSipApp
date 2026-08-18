@@ -48,7 +48,7 @@ public struct LoginView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    TextField("e.g. reception_1", text: $email)
+                    TextField("Enter username or email", text: $email)
                         .textFieldStyle(.roundedBorder)
                         #if os(iOS)
                         .textInputAutocapitalization(.never)
@@ -93,15 +93,6 @@ public struct LoginView: View {
                 .disabled(isLoading || email.isEmpty || password.isEmpty)
                 .opacity(email.isEmpty || password.isEmpty ? 0.6 : 1.0)
                 .padding(.top, 8)
-                
-                Button("Fill reception_1 (FreePBX)") {
-                    email = "reception_1"
-                    password = "reception_1"
-                }
-                .font(.footnote)
-                .foregroundColor(.accentColor)
-                .buttonStyle(.plain)
-                .padding(.top, 4)
             }
             .frame(maxWidth: 340)
             .padding(.horizontal, 24)
