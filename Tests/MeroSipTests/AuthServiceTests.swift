@@ -13,19 +13,18 @@ final class AuthServiceTests: XCTestCase {
     }
     
     func testSuccessfulLoginAndAutoProvisioning() async throws {
-        let response = try await authService.login(email: "john@company.com", password: "securepassword")
+        // Authenticate against production server with valid reception_1 credentials
+        let response = try await authService.login(email: "reception_1", password: "reception_1")
         
-        XCTAssertEqual(response.user.email, "john@company.com")
-        XCTAssertEqual(response.user.fullName, "John")
-        XCTAssertTrue(response.sipAccount.domain.contains("company.com"))
-        XCTAssertEqual(response.sipAccount.transport, .tls)
-        XCTAssertTrue(response.sipAccount.srtpEnabled)
+        XCTAssertEqual(response.user.email, "reception_1")
+        XCTAssertEqual(response.sipAccount.username, "201")
+        XCTAssertTrue(response.sipAccount.domain.contains("merosoftnepal.com"))
         XCTAssertFalse(response.authToken.isEmpty)
     }
     
     func testInvalidCredentialsRejection() async {
         do {
-            _ = try await authService.login(email: "", password: "")
+            _ = try await authService.login(email: "non_existent_user_9999", password: "invalid_password_xyz")
             XCTFail("Should fail with invalid credentials")
         } catch {
             XCTAssertTrue(true)
@@ -33,12 +32,12 @@ final class AuthServiceTests: XCTestCase {
     }
     
     func testSessionRestoreAndLogout() async throws {
-        let response = try await authService.login(email: "test@merosip.com", password: "password")
+        let response = try await authService.login(email: "reception_1", password: "reception_1")
         XCTAssertNotNil(response)
         
         let restored = await authService.restoreSession()
         XCTAssertNotNil(restored)
-        XCTAssertEqual(restored?.user.email, "test@merosip.com")
+        XCTAssertEqual(restored?.user.email, "reception_1")
         
         await authService.logout()
         let cleared = await authService.restoreSession()

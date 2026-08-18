@@ -124,7 +124,7 @@ public final class ContactsService: ContactsServiceProtocol, @unchecked Sendable
         
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (http.statusCode == 200 || http.statusCode == 201) else {
-            throw AuthError.serverError(500)
+            throw AuthError.serverError("Failed to save contact (HTTP \(response as? HTTPURLResponse != nil ? String((response as! HTTPURLResponse).statusCode) : "Unknown")).")
         }
         
         let decoder = JSONDecoder()

@@ -11,18 +11,18 @@ public protocol AuthServiceProtocol: Sendable {
 public enum AuthError: LocalizedError, Sendable {
     case invalidCredentials
     case networkFailure(String)
-    case serverError(Int)
+    case serverError(String)
     case decodingError
     case unauthenticated
     
     public var errorDescription: String? {
         switch self {
         case .invalidCredentials:
-            return "Invalid work email or password."
+            return "Invalid username or password. Please check credentials."
         case .networkFailure(let msg):
             return "Network connection error: \(msg)"
-        case .serverError(let code):
-            return "Server responded with error code \(code)."
+        case .serverError(let msg):
+            return msg
         case .decodingError:
             return "Failed to parse provisioning response from server."
         case .unauthenticated:
@@ -35,8 +35,8 @@ public enum AuthError: LocalizedError, Sendable {
 public final class AuthService: AuthServiceProtocol, @unchecked Sendable {
     public static let shared = AuthService()
     
-    private let session: URLSession
     private let baseUrl: URL
+    private let session: URLSession
     private let keychain: KeychainManager
     
     private let sessionUserKey = "merosip.auth.user"
@@ -58,7 +58,6 @@ public final class AuthService: AuthServiceProtocol, @unchecked Sendable {
     }
     
     public func login(email: String, password: String) async throws -> ProvisioningResponse {
-        // Validate basic inputs
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedEmail.isEmpty, !password.isEmpty else {
             throw AuthError.invalidCredentials
@@ -69,7 +68,7 @@ public final class AuthService: AuthServiceProtocol, @unchecked Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 4.0
+        request.timeoutInterval = 10.0
         
         let body: [String: String] = [
             "email": trimmedEmail,
@@ -79,51 +78,32 @@ public final class AuthService: AuthServiceProtocol, @unchecked Sendable {
         
         do {
             let (data, response) = try await session.data(for: request)
-            if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+            guard let http = response as? HTTPURLResponse else {
+                throw AuthError.serverError("No response received from production server.")
+            }
+            
+            if http.statusCode == 200 {
                 let decoder = JSONDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 let provisioned = try decoder.decode(ProvisioningResponse.self, from: data)
                 saveSession(response: provisioned)
+                print("[AuthService] Successfully authenticated with production server. User: \(provisioned.user.email), SIP Extension: \(provisioned.sipAccount.username) on \(provisioned.sipAccount.domain)")
                 return provisioned
+            } else if http.statusCode == 401 || http.statusCode == 422 {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let message = json["message"] as? String {
+                    throw AuthError.serverError(message)
+                }
+                throw AuthError.invalidCredentials
+            } else {
+                throw AuthError.serverError("Server returned status code \(http.statusCode)")
             }
+        } catch let err as AuthError {
+            throw err
         } catch {
-            // If local backend is temporarily unreachable, fall back to seamless simulated login
+            print("[AuthService] Network error during login: \(error)")
+            throw AuthError.networkFailure(error.localizedDescription)
         }
-        
-        // Seamless fallback provisioning
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        let domain = trimmedEmail.contains("@") ? String(trimmedEmail.split(separator: "@").last ?? "sip.merosip.com") : "sip.merosip.com"
-        let username = trimmedEmail.contains("@") ? String(trimmedEmail.split(separator: "@").first ?? "user") : trimmedEmail
-        let ext = String(abs(username.hashValue) % 9000 + 1000)
-        
-        let user = AuthUser(
-            id: UUID().uuidString,
-            email: trimmedEmail,
-            fullName: username.capitalized,
-            organization: domain.capitalized,
-            sipExtension: ext
-        )
-        
-        let account = SIPAccount(
-            username: ext,
-            domain: "sip.\(domain)",
-            displayName: user.fullName,
-            proxy: "proxy.\(domain)",
-            port: 5061,
-            transport: .tls,
-            srtpEnabled: true,
-            stunServer: "stun.l.google.com:19302",
-            token: "jwt_tok_\(UUID().uuidString)"
-        )
-        
-        let response = ProvisioningResponse(
-            user: user,
-            sipAccount: account,
-            authToken: account.token ?? "token"
-        )
-        
-        saveSession(response: response)
-        return response
     }
     
     public func restoreSession() async -> ProvisioningResponse? {
