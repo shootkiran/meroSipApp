@@ -141,11 +141,15 @@ public final class AppUpdateManager: NSObject, ObservableObject, URLSessionDownl
         let script = """
         sleep 1
         mkdir -p /tmp/MeroSipExtracted
+        rm -rf /tmp/MeroSipExtracted/*
         unzip -o "\(zipUrl.path)" -d /tmp/MeroSipExtracted
         if [ -d "/tmp/MeroSipExtracted/MeroSip.app" ]; then
+            xattr -cr /tmp/MeroSipExtracted/MeroSip.app 2>/dev/null || true
             cp -R /tmp/MeroSipExtracted/MeroSip.app /Applications/
+            xattr -cr /Applications/MeroSip.app 2>/dev/null || true
             open /Applications/MeroSip.app
         elif [ -f "\(appBundlePath)" ]; then
+            xattr -cr "\(appBundlePath)" 2>/dev/null || true
             open "\(appBundlePath)"
         fi
         """
