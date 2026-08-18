@@ -22,11 +22,11 @@ public final class AppUpdateManager: NSObject, ObservableObject, URLSessionDownl
     public private(set) var savedUpdateZipUrl: URL?
     
     public var currentVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.4"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.5"
     }
     
     public var currentBuild: Int {
-        Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "5") ?? 5
+        Int(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "6") ?? 6
     }
     
     private var downloadTask: URLSessionDownloadTask?

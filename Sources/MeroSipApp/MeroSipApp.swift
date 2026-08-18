@@ -11,7 +11,7 @@ struct MeroSipApp: App {
     
     var body: some Scene {
         #if os(macOS)
-        WindowGroup("MeroSip Softphone") {
+        Window("MeroSip Softphone", id: "main") {
             AppRootView(callManager: environment.callManager)
                 .task {
                     await environment.bootstrap()

@@ -25,8 +25,14 @@ public final class MeroSipAppDelegate: NSObject, NSApplicationDelegate, NSWindow
     }
     
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        for window in sender.windows where !window.className.contains("NSStatusBarWindow") {
+        let targetWindow = Self.mainWindow ?? sender.windows.first(where: { !($0.className.contains("NSStatusBarWindow")) && $0.canBecomeMain })
+        if let window = targetWindow {
+            window.setIsVisible(true)
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
             window.makeKeyAndOrderFront(self)
+            return false
         }
         return true
     }
