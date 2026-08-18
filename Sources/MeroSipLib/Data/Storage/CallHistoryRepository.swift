@@ -9,7 +9,7 @@ public final class CallHistoryRepository: ObservableObject {
     
     private let storageUrl: URL
     private let session = URLSession.shared
-    private let baseUrl = URL(string: "http://merosipbackend.test/api/v1")!
+    private let baseUrl = URL(string: "https://sipbackend.mims.top/api/v1")!
     private let keychain = KeychainManager.shared
     private let tokenKey = "merosip.auth.jwt"
     

@@ -19,7 +19,7 @@ public final class ContactsService: ContactsServiceProtocol, @unchecked Sendable
     private let tokenKey = "merosip.auth.jwt"
     
     public init(
-        baseUrl: URL = URL(string: "http://merosipbackend.test/api/v1")!,
+        baseUrl: URL = URL(string: "https://sipbackend.mims.top/api/v1")!,
         session: URLSession = .shared,
         keychain: KeychainManager = .shared
     ) {
