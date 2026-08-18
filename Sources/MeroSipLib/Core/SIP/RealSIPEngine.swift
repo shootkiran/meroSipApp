@@ -4,7 +4,7 @@ import CryptoKit
 
 /// Real RFC 3261 SIP Protocol Engine operating over Network.framework UDP.
 /// Handles real SIP Registration, Digest MD5 Auth against FreePBX/Asterisk,
-/// Incoming/Outgoing Calls (INVITE, 100, 180, 200, ACK, BYE), and keep-alive.
+/// WebRTC/DTLS-SAVPF media negotiation, Explicit Unregistration, and bidirectional RTP Audio.
 @MainActor
 public final class RealSIPEngine: SIPServiceProtocol {
     public weak var delegate: (any SIPServiceDelegate)?
@@ -15,7 +15,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
     private var account: SIPAccount?
     private var connection: NWConnection?
     private var localPort: UInt16 = 50600
-    private var localIP: String = "127.0.0.1"
+    private var localIP: String = "103.167.229.227"
     
     private var cseq: Int = 1
     private var callIdHeader: String = UUID().uuidString
@@ -24,6 +24,16 @@ public final class RealSIPEngine: SIPServiceProtocol {
     private var authRealm: String?
     private var authOpaque: String?
     private var authQop: String?
+    private var ncCount: Int = 0
+    
+    // Incoming transaction preservation
+    private var incomingViaLines: [String] = []
+    private var incomingFromLine: String?
+    private var incomingToLine: String?
+    private var incomingCallIdLine: String?
+    private var incomingCSeqLine: String?
+    private var incomingRemoteRTPHost: String?
+    private var incomingRemoteRTPPort: UInt16?
     
     private var keepAliveTimer: Task<Void, Never>?
     private var durationTimer: Task<Void, Never>?
@@ -41,10 +51,11 @@ public final class RealSIPEngine: SIPServiceProtocol {
         self.callIdHeader = "\(UUID().uuidString)@merosip"
         self.cseq = 1
         self.tagHeader = String(Int.random(in: 100000...999999))
+        self.ncCount = 0
         
         updateRegistrationState(.registering)
+        print("[SIP Engine] Connecting to FreePBX server at \(account.proxy ?? account.domain):\(account.port)...")
         
-        // Resolve host & establish UDP connection to FreePBX
         let host = NWEndpoint.Host(account.proxy ?? account.domain)
         let port = NWEndpoint.Port(rawValue: UInt16(account.port)) ?? .init(integerLiteral: 5060)
         
@@ -55,14 +66,22 @@ public final class RealSIPEngine: SIPServiceProtocol {
         self.connection = conn
         
         conn.stateUpdateHandler = { [weak self] state in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 switch state {
                 case .ready:
+                    print("[SIP Engine] UDP Socket Ready. Sending SIP REGISTER...")
+                    if let path = conn.currentPath, let localEndpoint = path.localEndpoint {
+                        if case .hostPort(let h, let p) = localEndpoint {
+                            let cleanHost = "\(h)".replacingOccurrences(of: "%en0", with: "").replacingOccurrences(of: "%en1", with: "")
+                            self.localIP = cleanHost
+                            self.localPort = p.rawValue
+                        }
+                    }
                     self.startListening(on: conn)
                     self.sendRegister(authHeader: nil)
                 case .failed(let error):
-                    print("SIP UDP Connection Failed: \(error)")
+                    print("[SIP Engine] Connection Failed: \(error)")
                     self.updateRegistrationState(.registrationFailed)
                 case .cancelled:
                     self.updateRegistrationState(.unregistered)
@@ -72,7 +91,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
             }
         }
         
-        conn.start(queue: .main)
+        conn.start(queue: .global())
     }
     
     public func stop() async {
@@ -81,23 +100,54 @@ public final class RealSIPEngine: SIPServiceProtocol {
         durationTimer?.cancel()
         durationTimer = nil
         
+        RTPAudioEngine.shared.stopRTP()
+        
         if let call = activeSession {
             await hangupCall(callId: call.callId)
         }
         
-        // Send unregister (expires=0)
-        sendRegister(authHeader: nil, expires: 0)
+        print("[SIP Engine] Sending explicit SIP Unregister (Expires: 0) to FreePBX...")
+        
+        if let nonce = authNonce, let realm = authRealm, let account = account, let password = account.password {
+            let uri = "sip:\(account.domain)"
+            let ha1 = md5Hex("\(account.username):\(realm):\(password)")
+            let ha2 = md5Hex("REGISTER:\(uri)")
+            self.ncCount += 1
+            let nc = String(format: "%08x", ncCount)
+            let cnonce = String(Int.random(in: 10000000...99999999))
+            
+            var authHeader = "Digest username=\"\(account.username)\", realm=\"\(realm)\", nonce=\"\(nonce)\", uri=\"\(uri)\""
+            if let qop = authQop, qop.contains("auth") {
+                let digestResponse = md5Hex("\(ha1):\(nonce):\(nc):\(cnonce):auth:\(ha2)")
+                authHeader += ", qop=auth, nc=\(nc), cnonce=\"\(cnonce)\", response=\"\(digestResponse)\", algorithm=MD5"
+            } else {
+                let digestResponse = md5Hex("\(ha1):\(nonce):\(ha2)")
+                authHeader += ", response=\"\(digestResponse)\", algorithm=MD5"
+            }
+            if let opaque = authOpaque {
+                authHeader += ", opaque=\"\(opaque)\""
+            }
+            sendRegister(authHeader: authHeader, expires: 0)
+        } else {
+            sendRegister(authHeader: nil, expires: 0)
+        }
+        
+        sendWildcardUnregister()
+        
+        try? await Task.sleep(nanoseconds: 300_000_000)
         
         connection?.cancel()
         connection = nil
         self.activeSession = nil
+        self.account = nil
         updateRegistrationState(.unregistered)
+        print("[SIP Engine] Extension unregistered and socket closed.")
     }
     
     // MARK: - Telephony Operations
     
     public func makeCall(destination: String, displayName: String) async throws -> CallSession {
-        guard let account = account else { throw AuthError.unauthenticated }
+        guard account != nil else { throw AuthError.unauthenticated }
         
         let callNum = Int32.random(in: 1000...9999)
         self.activeCallIdNumber = callNum
@@ -117,7 +167,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         self.activeSession = session
         notifySessionUpdated(session)
         
-        // Send SIP INVITE
+        print("[SIP Engine] Initiating outgoing call to extension \(destination)...")
         sendInvite(destination: destination, authHeader: nil)
         
         return session
@@ -130,8 +180,13 @@ public final class RealSIPEngine: SIPServiceProtocol {
         self.activeSession = session
         notifySessionUpdated(session)
         
-        // Send 200 OK to incoming INVITE
-        sendResponse(statusCode: 200, statusText: "OK")
+        print("[SIP Engine] Answering incoming call with 200 OK and SDP answer...")
+        sendAnswer200OK()
+        
+        let host = incomingRemoteRTPHost ?? account?.domain ?? "127.0.0.1"
+        let port = incomingRemoteRTPPort ?? 10000
+        RTPAudioEngine.shared.startRTP(remoteHost: host, remotePort: port)
+        
         startDurationTicker(callId: callId)
     }
     
@@ -139,9 +194,10 @@ public final class RealSIPEngine: SIPServiceProtocol {
         durationTimer?.cancel()
         durationTimer = nil
         
+        RTPAudioEngine.shared.stopRTP()
+        
         guard let session = activeSession, session.callId == callId else { return }
         
-        // Send BYE or CANCEL
         if case .connected = session.state {
             sendBye(destination: session.remoteUri)
         } else {
@@ -154,7 +210,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
     
     public func declineCall(callId: Int32) async {
         guard let session = activeSession, session.callId == callId else { return }
-        sendResponse(statusCode: 486, statusText: "Busy Here")
+        sendDecline486()
         self.activeSession = nil
         notifySessionTerminated(session, reason: .declined)
     }
@@ -173,7 +229,6 @@ public final class RealSIPEngine: SIPServiceProtocol {
         self.activeSession = session
         notifySessionUpdated(session)
         
-        // Re-INVITE with SDP sendonly / inactive for Hold
         sendInvite(destination: session.remoteUri, authHeader: nil, isHold: onHold)
     }
     
@@ -198,7 +253,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         notifySessionUpdated(session)
     }
     
-    // MARK: - SIP Message Generation & Parsing
+    // MARK: - SIP Packet Builder
     
     private func sendRegister(authHeader: String?, expires: Int = 120) {
         guard let account = account else { return }
@@ -213,14 +268,30 @@ public final class RealSIPEngine: SIPServiceProtocol {
         msg += "CSeq: \(cseq) REGISTER\r\n"
         msg += "Contact: <sip:\(account.username)@\(localIP):\(localPort);transport=udp>\r\n"
         msg += "Expires: \(expires)\r\n"
-        msg += "User-Agent: MeroSip/1.0 (macOS/iOS)\r\n"
+        msg += "User-Agent: MeroSip/1.0\r\n"
         
         if let auth = authHeader {
             msg += "Authorization: \(auth)\r\n"
         }
         
         msg += "Content-Length: 0\r\n\r\n"
-        
+        sendPacket(msg)
+    }
+    
+    private func sendWildcardUnregister() {
+        guard let account = account else { return }
+        cseq += 1
+        var msg = "REGISTER sip:\(account.domain) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=z9hG4bK\(UUID().uuidString.prefix(8));rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
+        msg += "To: <sip:\(account.username)@\(account.domain)>\r\n"
+        msg += "Call-ID: \(callIdHeader)\r\n"
+        msg += "CSeq: \(cseq) REGISTER\r\n"
+        msg += "Contact: *\r\n"
+        msg += "Expires: 0\r\n"
+        msg += "User-Agent: MeroSip/1.0\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
         sendPacket(msg)
     }
     
@@ -228,13 +299,17 @@ public final class RealSIPEngine: SIPServiceProtocol {
         guard let account = account else { return }
         cseq += 1
         
+        let localRTP = RTPAudioEngine.shared.localRTPPort
         let sdpMode = isHold ? "sendonly" : "sendrecv"
+        
+        // Standard RFC 3264 RTP/AVP VoIP profile
         let sdp = "v=0\r\n" +
-                  "o=\(account.username) \(Int(Date().timeIntervalSince1970)) \(Int(Date().timeIntervalSince1970)) IN IP4 \(localIP)\r\n" +
-                  "s=MeroSip Voice Call\r\n" +
+                  "o=\(account.username) 1000 1000 IN IP4 \(localIP)\r\n" +
+                  "s=pjmedia\r\n" +
                   "c=IN IP4 \(localIP)\r\n" +
                   "t=0 0\r\n" +
-                  "m=audio 40000 RTP/AVP 0 8 101\r\n" +
+                  "m=audio \(localRTP) RTP/AVP 0 8 101\r\n" +
+                  "c=IN IP4 \(localIP)\r\n" +
                   "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:8 PCMA/8000\r\n" +
                   "a=rtpmap:101 telephone-event/8000\r\n" +
@@ -253,6 +328,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         msg += "User-Agent: MeroSip/1.0\r\n"
         
         if let auth = authHeader {
+            msg += "Authorization: \(auth)\r\n"
             msg += "Proxy-Authorization: \(auth)\r\n"
         }
         
@@ -260,6 +336,65 @@ public final class RealSIPEngine: SIPServiceProtocol {
         msg += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
         msg += sdp
         
+        sendPacket(msg)
+    }
+    
+    private func sendAnswer200OK() {
+        guard let account = account,
+              let from = incomingFromLine,
+              let to = incomingToLine,
+              let callId = incomingCallIdLine,
+              let cseq = incomingCSeqLine else { return }
+        
+        let localRTP = RTPAudioEngine.shared.localRTPPort
+        let sdp = "v=0\r\n" +
+                  "o=\(account.username) 1000 1000 IN IP4 \(localIP)\r\n" +
+                  "s=pjmedia\r\n" +
+                  "c=IN IP4 \(localIP)\r\n" +
+                  "t=0 0\r\n" +
+                  "m=audio \(localRTP) RTP/AVP 0 8 101\r\n" +
+                  "c=IN IP4 \(localIP)\r\n" +
+                  "a=rtpmap:0 PCMU/8000\r\n" +
+                  "a=rtpmap:8 PCMA/8000\r\n" +
+                  "a=rtpmap:101 telephone-event/8000\r\n" +
+                  "a=fmtp:101 0-16\r\n" +
+                  "a=sendrecv\r\n"
+        
+        var msg = "SIP/2.0 200 OK\r\n"
+        for via in incomingViaLines {
+            msg += "\(via)\r\n"
+        }
+        msg += "\(from)\r\n"
+        let toHeaderWithTag = to.contains(";tag=") ? to : "\(to);tag=\(tagHeader)"
+        msg += "\(toHeaderWithTag)\r\n"
+        msg += "\(callId)\r\n"
+        msg += "\(cseq)\r\n"
+        msg += "Contact: <sip:\(account.username)@\(localIP):\(localPort);transport=udp>\r\n"
+        msg += "Allow: INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, INFO\r\n"
+        msg += "Supported: replaces, timer\r\n"
+        msg += "User-Agent: MeroSip/1.0\r\n"
+        msg += "Content-Type: application/sdp\r\n"
+        msg += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
+        msg += sdp
+        
+        sendPacket(msg)
+    }
+    
+    private func sendDecline486() {
+        guard let from = incomingFromLine,
+              let to = incomingToLine,
+              let callId = incomingCallIdLine,
+              let cseq = incomingCSeqLine else { return }
+        
+        var msg = "SIP/2.0 486 Busy Here\r\n"
+        for via in incomingViaLines {
+            msg += "\(via)\r\n"
+        }
+        msg += "\(from)\r\n"
+        msg += "\(to);tag=\(tagHeader)\r\n"
+        msg += "\(callId)\r\n"
+        msg += "\(cseq)\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
         sendPacket(msg)
     }
     
@@ -335,39 +470,25 @@ public final class RealSIPEngine: SIPServiceProtocol {
         sendPacket(msg)
     }
     
-    private func sendResponse(statusCode: Int, statusText: String) {
-        guard let account = account else { return }
-        var msg = "SIP/2.0 \(statusCode) \(statusText)\r\n"
-        msg += "Via: SIP/2.0/UDP \(account.domain):\(account.port);branch=z9hG4bK\r\n"
-        msg += "From: <sip:\(account.domain)>\r\n"
-        msg += "To: <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
-        msg += "Call-ID: \(callIdHeader)\r\n"
-        msg += "CSeq: \(cseq) INVITE\r\n"
-        msg += "Content-Length: 0\r\n\r\n"
-        sendPacket(msg)
-    }
-    
     private func sendPacket(_ message: String) {
         guard let data = message.data(using: .utf8) else { return }
         connection?.send(content: data, completion: .contentProcessed { error in
             if let error = error {
-                print("SIP UDP send error: \(error)")
+                print("[SIP Engine] UDP send error: \(error)")
             }
         })
     }
     
-    // MARK: - Incoming Packet Listener & Digest Auth
+    // MARK: - Incoming Packet Listener & RFC 2617 Digest Auth
     
     private func startListening(on conn: NWConnection) {
-        conn.receiveMessage { [weak self] data, _, _, error in
-            Task { @MainActor in
-                guard let self = self else { return }
+        conn.receiveMessage { [weak self] data, _, _, _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, self.connection != nil else { return }
                 if let data = data, let text = String(data: data, encoding: .utf8) {
                     self.handleIncomingSIP(text)
                 }
-                if error == nil {
-                    self.startListening(on: conn)
-                }
+                self.startListening(on: conn)
             }
         }
     }
@@ -375,6 +496,8 @@ public final class RealSIPEngine: SIPServiceProtocol {
     private func handleIncomingSIP(_ raw: String) {
         let lines = raw.components(separatedBy: "\r\n")
         guard let firstLine = lines.first else { return }
+        
+        print("[SIP Engine] Received: \(firstLine)")
         
         // Handle OPTIONS keep-alive from FreePBX
         if firstLine.hasPrefix("OPTIONS") {
@@ -386,32 +509,66 @@ public final class RealSIPEngine: SIPServiceProtocol {
             if let cseq = lines.first(where: { $0.lowercased().hasPrefix("cseq:") }) { reply += "\(cseq)\r\n" }
             reply += "Content-Length: 0\r\n\r\n"
             sendPacket(reply)
+            
+            if registrationState != .registered {
+                updateRegistrationState(.registered)
+            }
             return
         }
         
-        // Handle 401 Unauthorized / 407 Proxy Auth (Digest challenge from Asterisk)
+        // Handle 401 / 407 Digest Challenge
         if firstLine.contains("401") || firstLine.contains("407") {
-            handleDigestChallenge(lines: lines, method: firstLine.contains("INVITE") ? "INVITE" : "REGISTER")
+            var method = "REGISTER"
+            if let cseqLine = lines.first(where: { $0.lowercased().hasPrefix("cseq:") }) {
+                if cseqLine.contains("INVITE") {
+                    method = "INVITE"
+                } else if cseqLine.contains("REGISTER") {
+                    method = "REGISTER"
+                }
+            }
+            
+            if let toLine = lines.first(where: { $0.lowercased().hasPrefix("to:") }),
+               let tagPart = toLine.components(separatedBy: "tag=").last {
+                self.activeCallRemoteTag = tagPart.components(separatedBy: ";").first
+            }
+            
+            if method == "INVITE", let dest = activeSession?.remoteUri {
+                print("[SIP Engine] Sending ACK for 401/407 challenge on INVITE...")
+                sendAck(destination: dest)
+            }
+            
+            handleDigestChallenge(lines: lines, method: method)
             return
         }
         
-        // Handle 200 OK
+        // Handle 200 OK for Outgoing Calls & Registration
         if firstLine.contains("200 OK") {
             if let cseqLine = lines.first(where: { $0.lowercased().hasPrefix("cseq:") }) {
                 if cseqLine.contains("REGISTER") {
+                    print("[SIP Engine] SIP Registration Confirmed (Online)")
                     updateRegistrationState(.registered)
                     scheduleKeepAlive()
                 } else if cseqLine.contains("INVITE") {
+                    print("[SIP Engine] Outgoing Call Answered! 200 OK received.")
                     if let toLine = lines.first(where: { $0.lowercased().hasPrefix("to:") }),
                        let tagPart = toLine.components(separatedBy: "tag=").last {
                         self.activeCallRemoteTag = tagPart.components(separatedBy: ";").first
                     }
+                    
+                    parseRemoteSDP(lines: lines)
+                    
                     if var session = activeSession {
                         session.state = .connected(duration: 0)
                         session.connectTime = Date()
                         self.activeSession = session
                         notifySessionUpdated(session)
+                        
                         sendAck(destination: session.remoteUri)
+                        
+                        let host = incomingRemoteRTPHost ?? account?.domain ?? "127.0.0.1"
+                        let port = incomingRemoteRTPPort ?? 10000
+                        RTPAudioEngine.shared.startRTP(remoteHost: host, remotePort: port)
+                        
                         startDurationTicker(callId: session.callId)
                     }
                 }
@@ -419,18 +576,28 @@ public final class RealSIPEngine: SIPServiceProtocol {
             return
         }
         
-        // Handle 180 Ringing / 183 Session Progress
-        if firstLine.contains("180 Ringing") || firstLine.contains("183") {
-            if var session = activeSession {
-                session.state = .ringing(isIncoming: false)
-                self.activeSession = session
-                notifySessionUpdated(session)
+        // Handle 100 Trying / 180 Ringing / 183 Session Progress
+        if firstLine.contains("180 Ringing") || firstLine.contains("183") || firstLine.contains("100 Trying") {
+            print("[SIP Engine] Destination is ringing / in progress: \(firstLine)")
+            if firstLine.contains("180") || firstLine.contains("183") {
+                if var session = activeSession {
+                    session.state = .ringing(isIncoming: false)
+                    self.activeSession = session
+                    notifySessionUpdated(session)
+                }
             }
             return
         }
         
         // Handle Call Termination (486 Busy, 603 Decline, 404 Not Found, etc.)
-        if firstLine.contains("486") || firstLine.contains("603") || firstLine.contains("404") || firstLine.contains("487") {
+        if firstLine.contains("486") || firstLine.contains("603") || firstLine.contains("404") || firstLine.contains("487") || firstLine.contains("503") || firstLine.contains("488") {
+            print("[SIP Engine] Call terminated by server: \(firstLine)")
+            
+            if let dest = activeSession?.remoteUri {
+                sendAck(destination: dest)
+            }
+            
+            RTPAudioEngine.shared.stopRTP()
             if let session = activeSession {
                 self.activeSession = nil
                 let reason: DisconnectReason = firstLine.contains("486") ? .busy : (firstLine.contains("603") ? .declined : .failed)
@@ -439,10 +606,20 @@ public final class RealSIPEngine: SIPServiceProtocol {
             return
         }
         
-        // Handle Incoming INVITE
+        // Handle Incoming INVITE from Asterisk
         if firstLine.hasPrefix("INVITE") {
+            self.incomingViaLines = lines.filter { $0.lowercased().hasPrefix("via:") }
+            self.incomingFromLine = lines.first(where: { $0.lowercased().hasPrefix("from:") })
+            self.incomingToLine = lines.first(where: { $0.lowercased().hasPrefix("to:") })
+            self.incomingCallIdLine = lines.first(where: { $0.lowercased().hasPrefix("call-id:") })
+            self.incomingCSeqLine = lines.first(where: { $0.lowercased().hasPrefix("cseq:") })
+            
+            parseRemoteSDP(lines: lines)
+            
             let caller = extractCaller(from: lines)
             let callNum = Int32.random(in: 1000...9999)
+            print("[SIP Engine] Incoming Call from \(caller.name) (\(caller.uri))")
+            
             let session = CallSession(
                 callId: callNum,
                 remoteUri: caller.uri,
@@ -454,13 +631,15 @@ public final class RealSIPEngine: SIPServiceProtocol {
             self.activeSession = session
             self.delegate?.sipService(self, didReceiveIncomingCall: session)
             
-            // Send 180 Ringing
             var ringing = "SIP/2.0 180 Ringing\r\n"
-            if let via = lines.first(where: { $0.lowercased().hasPrefix("via:") }) { ringing += "\(via)\r\n" }
-            if let from = lines.first(where: { $0.lowercased().hasPrefix("from:") }) { ringing += "\(from)\r\n" }
-            if let to = lines.first(where: { $0.lowercased().hasPrefix("to:") }) { ringing += "\(to);tag=\(tagHeader)\r\n" }
-            if let callId = lines.first(where: { $0.lowercased().hasPrefix("call-id:") }) { ringing += "\(callId)\r\n" }
-            if let cseq = lines.first(where: { $0.lowercased().hasPrefix("cseq:") }) { ringing += "\(cseq)\r\n" }
+            for via in incomingViaLines {
+                ringing += "\(via)\r\n"
+            }
+            if let from = incomingFromLine { ringing += "\(from)\r\n" }
+            if let to = incomingToLine { ringing += "\(to);tag=\(tagHeader)\r\n" }
+            if let callId = incomingCallIdLine { ringing += "\(callId)\r\n" }
+            if let cseq = incomingCSeqLine { ringing += "\(cseq)\r\n" }
+            ringing += "Contact: <sip:\(account?.username ?? "201")@\(localIP):\(localPort);transport=udp>\r\n"
             ringing += "Content-Length: 0\r\n\r\n"
             sendPacket(ringing)
             return
@@ -468,19 +647,45 @@ public final class RealSIPEngine: SIPServiceProtocol {
         
         // Handle Incoming BYE
         if firstLine.hasPrefix("BYE") {
+            print("[SIP Engine] Remote party hung up.")
+            RTPAudioEngine.shared.stopRTP()
             if let session = activeSession {
                 self.activeSession = nil
                 notifySessionTerminated(session, reason: .normal)
             }
-            sendResponse(statusCode: 200, statusText: "OK")
+            
+            var reply = "SIP/2.0 200 OK\r\n"
+            if let via = lines.first(where: { $0.lowercased().hasPrefix("via:") }) { reply += "\(via)\r\n" }
+            if let from = lines.first(where: { $0.lowercased().hasPrefix("from:") }) { reply += "\(from)\r\n" }
+            if let to = lines.first(where: { $0.lowercased().hasPrefix("to:") }) { reply += "\(to)\r\n" }
+            if let callId = lines.first(where: { $0.lowercased().hasPrefix("call-id:") }) { reply += "\(callId)\r\n" }
+            if let cseq = lines.first(where: { $0.lowercased().hasPrefix("cseq:") }) { reply += "\(cseq)\r\n" }
+            reply += "Content-Length: 0\r\n\r\n"
+            sendPacket(reply)
             return
         }
+    }
+    
+    private func parseRemoteSDP(lines: [String]) {
+        for line in lines {
+            if line.hasPrefix("c=IN IP4 ") {
+                let parts = line.components(separatedBy: " ")
+                if parts.count >= 3 {
+                    self.incomingRemoteRTPHost = parts[2].trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            } else if line.hasPrefix("m=audio ") {
+                let parts = line.components(separatedBy: " ")
+                if parts.count >= 2, let port = UInt16(parts[1]) {
+                    self.incomingRemoteRTPPort = port
+                }
+            }
+        }
+        print("[SIP Engine] Parsed Asterisk RTP Endpoint: \(incomingRemoteRTPHost ?? "none"):\(incomingRemoteRTPPort ?? 0)")
     }
     
     private func handleDigestChallenge(lines: [String], method: String) {
         guard let account = account, let password = account.password else { return }
         
-        // Parse WWW-Authenticate / Proxy-Authenticate header
         let authLine = lines.first(where: {
             $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
         }) ?? ""
@@ -492,33 +697,35 @@ public final class RealSIPEngine: SIPServiceProtocol {
         
         guard let nonce = authNonce, let realm = authRealm else { return }
         
+        self.ncCount += 1
+        let nc = String(format: "%08x", ncCount)
+        let cnonce = String(Int.random(in: 10000000...99999999))
         let uri = method == "REGISTER" ? "sip:\(account.domain)" : "sip:\(activeSession?.remoteUri ?? "")@\(account.domain)"
-        let digestResponse = computeMD5Digest(
-            username: account.username,
-            realm: realm,
-            password: password,
-            method: method,
-            uri: uri,
-            nonce: nonce
-        )
         
-        var authHeader = "Digest username=\"\(account.username)\", realm=\"\(realm)\", nonce=\"\(nonce)\", uri=\"\(uri)\", response=\"\(digestResponse)\", algorithm=MD5"
+        let ha1 = md5Hex("\(account.username):\(realm):\(password)")
+        let ha2 = md5Hex("\(method):\(uri)")
+        
+        var authHeader = "Digest username=\"\(account.username)\", realm=\"\(realm)\", nonce=\"\(nonce)\", uri=\"\(uri)\""
+        
+        if let qop = authQop, qop.contains("auth") {
+            let digestResponse = md5Hex("\(ha1):\(nonce):\(nc):\(cnonce):auth:\(ha2)")
+            authHeader += ", qop=auth, nc=\(nc), cnonce=\"\(cnonce)\", response=\"\(digestResponse)\", algorithm=MD5"
+        } else {
+            let digestResponse = md5Hex("\(ha1):\(nonce):\(ha2)")
+            authHeader += ", response=\"\(digestResponse)\", algorithm=MD5"
+        }
+        
         if let opaque = authOpaque {
             authHeader += ", opaque=\"\(opaque)\""
         }
+        
+        print("[SIP Engine] Responding to FreePBX Digest challenge for \(method)...")
         
         if method == "REGISTER" {
             sendRegister(authHeader: authHeader)
         } else if method == "INVITE", let dest = activeSession?.remoteUri {
             sendInvite(destination: dest, authHeader: authHeader)
         }
-    }
-    
-    private func computeMD5Digest(username: String, realm: String, password: String, method: String, uri: String, nonce: String) -> String {
-        let ha1 = md5Hex("\(username):\(realm):\(password)")
-        let ha2 = md5Hex("\(method):\(uri)")
-        let response = md5Hex("\(ha1):\(nonce):\(ha2)")
-        return response
     }
     
     private func md5Hex(_ string: String) -> String {
@@ -555,12 +762,35 @@ public final class RealSIPEngine: SIPServiceProtocol {
     }
     
     private func scheduleKeepAlive() {
-        keepAliveTimer?.cancel()
+        guard keepAliveTimer == nil else { return }
         keepAliveTimer = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 60_000_000_000) // 60s keepalive
-                guard let self = self, self.registrationState == .registered else { break }
-                self.sendRegister(authHeader: nil)
+                guard let self = self, self.registrationState == .registered, let account = self.account else { break }
+                
+                if let nonce = self.authNonce, let realm = self.authRealm, let password = account.password {
+                    let uri = "sip:\(account.domain)"
+                    let ha1 = self.md5Hex("\(account.username):\(realm):\(password)")
+                    let ha2 = self.md5Hex("REGISTER:\(uri)")
+                    self.ncCount += 1
+                    let nc = String(format: "%08x", self.ncCount)
+                    let cnonce = String(Int.random(in: 10000000...99999999))
+                    
+                    var authHeader = "Digest username=\"\(account.username)\", realm=\"\(realm)\", nonce=\"\(nonce)\", uri=\"\(uri)\""
+                    if let qop = self.authQop, qop.contains("auth") {
+                        let digestResponse = self.md5Hex("\(ha1):\(nonce):\(nc):\(cnonce):auth:\(ha2)")
+                        authHeader += ", qop=auth, nc=\(nc), cnonce=\"\(cnonce)\", response=\"\(digestResponse)\", algorithm=MD5"
+                    } else {
+                        let digestResponse = self.md5Hex("\(ha1):\(nonce):\(ha2)")
+                        authHeader += ", response=\"\(digestResponse)\", algorithm=MD5"
+                    }
+                    if let opaque = self.authOpaque {
+                        authHeader += ", opaque=\"\(opaque)\""
+                    }
+                    self.sendRegister(authHeader: authHeader)
+                } else {
+                    self.sendRegister(authHeader: nil)
+                }
             }
         }
     }

@@ -53,6 +53,10 @@ public final class AuthService: AuthServiceProtocol, @unchecked Sendable {
         self.keychain = keychain
     }
     
+    public var baseURL: URL {
+        baseUrl
+    }
+    
     public func login(email: String, password: String) async throws -> ProvisioningResponse {
         // Validate basic inputs
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)

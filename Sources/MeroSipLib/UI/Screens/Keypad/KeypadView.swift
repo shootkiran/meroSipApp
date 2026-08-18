@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// Modern Production Dialpad view for placing outgoing SIP calls over FreePBX.
+/// Modern Production Dialpad view supporting both on-screen buttons and physical keyboard input.
 public struct KeypadView: View {
     @ObservedObject var callManager: CallManager
     
     @State private var dialedNumber = ""
     @State private var matchedContact: CloudContact?
+    @FocusState private var isFieldFocused: Bool
+    
     private let contactsService = ContactsService.shared
     
     public init(callManager: CallManager) {
@@ -56,14 +58,26 @@ public struct KeypadView: View {
                 .transition(.opacity)
             }
             
-            // Dialed Number Display
+            // Dialed Number Display with direct physical keyboard typing support
             HStack {
                 Spacer()
                 
-                Text(dialedNumber.isEmpty ? " " : dialedNumber)
-                    .font(.system(size: 36, weight: .light, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                TextField("Enter number or extension", text: $dialedNumber)
+                    .font(.system(size: 34, weight: .light, design: .rounded))
+                    .multilineTextAlignment(.center)
+                    .textFieldStyle(.plain)
+                    .focused($isFieldFocused)
+                    .onChange(of: dialedNumber) { _, newValue in
+                        // Filter out non-dialpad characters
+                        let filtered = newValue.filter { "0123456789*#+ ".contains($0) }
+                        if filtered != newValue {
+                            dialedNumber = filtered
+                        }
+                        lookupContact()
+                    }
+                    .onSubmit {
+                        performCall()
+                    }
                 
                 Spacer()
                 
@@ -82,8 +96,11 @@ public struct KeypadView: View {
                     .padding(.trailing, 8)
                 }
             }
-            .frame(height: 48)
+            .frame(height: 52)
             .padding(.horizontal, 24)
+            .background(Color.secondary.opacity(0.06))
+            .cornerRadius(12)
+            .padding(.horizontal, 32)
             
             // Dialpad Keypad Grid
             VStack(spacing: 14) {
@@ -115,15 +132,12 @@ public struct KeypadView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .help("Clear number (Esc)")
                 } else {
                     Color.clear.frame(width: 52, height: 52)
                 }
                 
-                Button(action: {
-                    guard !dialedNumber.isEmpty else { return }
-                    let name = matchedContact?.name ?? dialedNumber
-                    callManager.startCall(to: dialedNumber, displayName: name)
-                }) {
+                Button(action: performCall) {
                     Image(systemName: "phone.fill")
                         .font(.system(size: 26))
                         .foregroundColor(.white)
@@ -133,6 +147,7 @@ public struct KeypadView: View {
                         .shadow(color: dialedNumber.isEmpty ? .clear : .green.opacity(0.35), radius: 8, x: 0, y: 4)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(.return, modifiers: [])
                 .disabled(dialedNumber.isEmpty)
                 
                 Color.clear.frame(width: 52, height: 52)
@@ -142,16 +157,34 @@ public struct KeypadView: View {
             Spacer()
         }
         .frame(minWidth: 320)
+        .onAppear {
+            isFieldFocused = true
+        }
+        #if os(macOS)
+        .onKeyPress(.escape) {
+            dialedNumber = ""
+            matchedContact = nil
+            return .handled
+        }
+        #endif
+    }
+    
+    private func performCall() {
+        let trimmed = dialedNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let name = matchedContact?.name ?? trimmed
+        callManager.startCall(to: trimmed, displayName: name)
     }
     
     private func lookupContact() {
-        guard !dialedNumber.isEmpty else {
+        let trimmed = dialedNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
             matchedContact = nil
             return
         }
         Task {
-            let results = await contactsService.searchContacts(query: dialedNumber)
-            self.matchedContact = results.first(where: { $0.sipExtension == dialedNumber || $0.directPhone == dialedNumber })
+            let results = await contactsService.searchContacts(query: trimmed)
+            self.matchedContact = results.first(where: { $0.sipExtension == trimmed || $0.directPhone == trimmed })
         }
     }
 }

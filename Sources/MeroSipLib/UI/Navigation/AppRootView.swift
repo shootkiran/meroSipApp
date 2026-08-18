@@ -3,6 +3,7 @@ import SwiftUI
 /// Root multiplatform view orchestrating authentication state, active call overlays, and main navigation.
 public struct AppRootView: View {
     @ObservedObject var callManager: CallManager
+    @ObservedObject var updateManager = AppUpdateManager.shared
     
     public init(callManager: CallManager) {
         self.callManager = callManager
@@ -29,5 +30,12 @@ public struct AppRootView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: callManager.activeCall != nil)
         .animation(.easeInOut(duration: 0.3), value: callManager.currentUser != nil)
+        .sheet(isPresented: $updateManager.showUpdateModal) {
+            UpdateModalView()
+        }
+        .task {
+            // Check for updates in background on app launch
+            await updateManager.checkForUpdates(manual: false)
+        }
     }
 }

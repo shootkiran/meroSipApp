@@ -8,6 +8,10 @@ final class AuthServiceTests: XCTestCase {
         authService = AuthService()
     }
     
+    override func tearDown() async throws {
+        await authService.logout()
+    }
+    
     func testSuccessfulLoginAndAutoProvisioning() async throws {
         let response = try await authService.login(email: "john@company.com", password: "securepassword")
         

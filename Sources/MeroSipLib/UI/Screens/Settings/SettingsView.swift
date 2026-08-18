@@ -74,12 +74,55 @@ public struct SettingsView: View {
                     }
                 }
                 
+                // Software Updates
+                Section("Software Updates") {
+                    LabeledContent("Installed Version", value: "v\(AppUpdateManager.shared.currentVersion) (Build \(AppUpdateManager.shared.currentBuild))")
+                    
+                    HStack {
+                        Button(action: {
+                            Task {
+                                await AppUpdateManager.shared.checkForUpdates(manual: true)
+                            }
+                        }) {
+                            if AppUpdateManager.shared.isChecking {
+                                HStack(spacing: 6) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text("Checking for updates...")
+                                }
+                            } else {
+                                Label("Check for Updates", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                        }
+                        .disabled(AppUpdateManager.shared.isChecking)
+                        
+                        Spacer()
+                        
+                        if AppUpdateManager.shared.isUpToDate {
+                            Text("Up to date")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        } else if AppUpdateManager.shared.updateAvailable {
+                            Button("Update Available") {
+                                AppUpdateManager.shared.showUpdateModal = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                        }
+                    }
+                    
+                    if let err = AppUpdateManager.shared.errorMessage {
+                        Text(err)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+                
                 // Codecs & Telephony Info
                 Section("Telephony Engine & Codecs") {
                     LabeledContent("SIP Stack", value: "RFC 3261 Native UDP Engine")
                     LabeledContent("Supported Codecs", value: "PCMU (G.711u), PCMA (G.711a), Opus")
                     LabeledContent("DTMF Mode", value: "RFC 2833 / SIP INFO")
-                    LabeledContent("Version", value: "1.0.0 (Production Build)")
                 }
                 
                 // Logout Action
