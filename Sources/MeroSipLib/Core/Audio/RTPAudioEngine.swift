@@ -6,6 +6,8 @@ import Network
 /// without triggering Swift Concurrency MainActor isolation assertion traps.
 final class RealtimeAudioProcessor: @unchecked Sendable {
     var onEncodedRTPPacket: (@Sendable (Data) -> Void)?
+    var isMuted: Bool = false
+    var isOnHold: Bool = false
     
     private var sequenceNumber: UInt16 = UInt16.random(in: 1...1000)
     private var timestamp: UInt32 = UInt32.random(in: 1...100000)
@@ -41,10 +43,12 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
         var pos = 0.0
         var maxAmp: Float = 0.0
         while Int(pos) < frameCount {
-            let sample = channel[Int(pos)]
-            let absSample = abs(sample)
+            // Apply gentle voice pre-gain and sample
+            let rawSample = channel[Int(pos)]
+            let boosted = max(-1.0, min(1.0, rawSample * 1.4))
+            let absSample = abs(boosted)
             if absSample > maxAmp { maxAmp = absSample }
-            resampled.append(sample)
+            resampled.append(boosted)
             pos += step
         }
         
@@ -86,17 +90,18 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
         packet[10] = UInt8((ssrc >> 8) & 0xFF)
         packet[11] = UInt8(ssrc & 0xFF)
         
-        // Encode samples to standard ITU-T G.711u
+        // Encode samples to standard ITU-T G.711u (or silence 0xFF when muted or on hold)
+        let isSilent = isMuted || isOnHold
         for i in 0..<samples.count {
-            packet[12 + i] = RealtimeAudioProcessor.linearToMuLaw(samples[i])
+            packet[12 + i] = isSilent ? 0xFF : RealtimeAudioProcessor.linearToMuLaw(samples[i])
         }
         
         packetCount += 1
         if packetCount % 50 == 0 {
-            // Periodic activity check
-            let vol = recentMaxVolume
+            let vol = isSilent ? 0.0 : recentMaxVolume
             recentMaxVolume = 0.0
-            print("[RTP Audio] Mic transmitting: \(packetCount) pkts sent (Mic peak amp: \(String(format: "%.3f", vol)))")
+            let stateStr = isOnHold ? "[HOLD]" : (isMuted ? "[MUTED]" : "")
+            print("[RTP Audio] Mic transmitting \(stateStr): \(packetCount) pkts sent (Mic peak amp: \(String(format: "%.3f", vol)))")
         }
         
         onEncodedRTPPacket?(packet)
@@ -115,7 +120,6 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
             mask = 0xFF
         }
         
-        // Clip to maximum allowed range
         if pcm > 32635 { pcm = 32635 }
         pcm += 0x84
         
@@ -139,6 +143,12 @@ public final class RTPAudioEngine: ObservableObject {
     public static let shared = RTPAudioEngine()
     
     @Published public private(set) var isAudioRunning: Bool = false
+    @Published public var isMuted: Bool = false {
+        didSet { audioProcessor?.isMuted = isMuted }
+    }
+    @Published public var isOnHold: Bool = false {
+        didSet { audioProcessor?.isOnHold = isOnHold }
+    }
     
     private var rtpConnection: NWConnection?
     public private(set) var localRTPPort: UInt16 = 40000
@@ -168,18 +178,25 @@ public final class RTPAudioEngine: ObservableObject {
         
         self.remoteHost = remoteHost
         self.remotePort = remotePort
+        self.isMuted = false
+        self.isOnHold = false
         
         print("[RTP Audio] Starting RTP audio stream to \(remoteHost):\(remotePort) from local port \(localRTPPort)...")
         
         let processor = RealtimeAudioProcessor()
+        processor.isMuted = isMuted
+        processor.isOnHold = isOnHold
         self.audioProcessor = processor
         
-        // Setup UDP Connection to Asterisk RTP port
+        // Setup UDP Connection to Asterisk RTP port bound to localRTPPort for Symmetric NAT
         let host = NWEndpoint.Host(remoteHost)
         let port = NWEndpoint.Port(rawValue: remotePort) ?? .init(integerLiteral: 10000)
         
         let params = NWParameters.udp
         params.allowLocalEndpointReuse = true
+        if let localEndpointPort = NWEndpoint.Port(rawValue: localRTPPort) {
+            params.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.any), port: localEndpointPort)
+        }
         
         let conn = NWConnection(host: host, port: port, using: params)
         self.rtpConnection = conn
@@ -198,6 +215,14 @@ public final class RTPAudioEngine: ObservableObject {
                 if case .ready = state {
                     print("[RTP Audio] RTP UDP Socket Connected. Starting audio capture and playback...")
                     self.isAudioRunning = true
+                    
+                    // Send initial punch packet so Asterisk symmetric RTP immediately latches to our microphone port
+                    var initialPacket = Data(count: 12 + 160)
+                    initialPacket[0] = 0x80
+                    initialPacket[1] = 0x00
+                    for i in 12..<(12 + 160) { initialPacket[i] = 0xFF }
+                    conn.send(content: initialPacket, completion: .contentProcessed { _ in })
+                    
                     self.startRTPReceiver(on: conn)
                     self.startAudioEngine()
                 }

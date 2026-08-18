@@ -153,6 +153,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         self.activeCallIdNumber = callNum
         self.callIdHeader = "\(UUID().uuidString)@merosip"
         self.tagHeader = String(Int.random(in: 100000...999999))
+        self.activeCallRemoteTag = nil
         self.cseq += 1
         
         let session = CallSession(
@@ -219,6 +220,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         guard var session = activeSession, session.callId == callId else { return }
         session.isMuted = muted
         self.activeSession = session
+        RTPAudioEngine.shared.isMuted = muted
         notifySessionUpdated(session)
     }
     
@@ -227,6 +229,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         session.isOnHold = onHold
         session.state = onHold ? .holding : .connected(duration: session.duration)
         self.activeSession = session
+        RTPAudioEngine.shared.isOnHold = onHold
         notifySessionUpdated(session)
         
         sendInvite(destination: session.remoteUri, authHeader: nil, isHold: onHold)
@@ -301,31 +304,40 @@ public final class RealSIPEngine: SIPServiceProtocol {
         
         let localRTP = RTPAudioEngine.shared.localRTPPort
         let sdpMode = isHold ? "sendonly" : "sendrecv"
+        let connIP = isHold ? "0.0.0.0" : localIP
         
-        // Standard RFC 3264 RTP/AVP VoIP profile
+        // Standard RFC 3264 & RFC 2543 RTP/AVP VoIP profile matching Telephone.app / PJSIP
         let sdp = "v=0\r\n" +
                   "o=\(account.username) 1000 1000 IN IP4 \(localIP)\r\n" +
                   "s=pjmedia\r\n" +
-                  "c=IN IP4 \(localIP)\r\n" +
+                  "c=IN IP4 \(connIP)\r\n" +
                   "t=0 0\r\n" +
                   "m=audio \(localRTP) RTP/AVP 0 8 101\r\n" +
-                  "c=IN IP4 \(localIP)\r\n" +
                   "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:8 PCMA/8000\r\n" +
                   "a=rtpmap:101 telephone-event/8000\r\n" +
                   "a=fmtp:101 0-16\r\n" +
                   "a=\(sdpMode)\r\n"
         
+        // RFC 3261: Initial INVITE & Authenticated INVITE responding to 401/407 must NOT have a tag in the To header.
+        // In-dialog re-INVITE (Hold / Resume) MUST include the established remote dialog tag.
+        let toTagStr: String
+        if let tag = activeCallRemoteTag?.trimmingCharacters(in: .whitespacesAndNewlines), !tag.isEmpty {
+            toTagStr = ";tag=\(tag)"
+        } else {
+            toTagStr = ""
+        }
+        
         var msg = "INVITE sip:\(destination)@\(account.domain) SIP/2.0\r\n"
         msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=z9hG4bK\(UUID().uuidString.prefix(8));rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(account.displayName)\" <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
-        msg += "To: <sip:\(destination)@\(account.domain)>\r\n"
+        msg += "To: <sip:\(destination)@\(account.domain)>\(toTagStr)\r\n"
         msg += "Call-ID: \(callIdHeader)\r\n"
         msg += "CSeq: \(cseq) INVITE\r\n"
         msg += "Contact: <sip:\(account.username)@\(localIP):\(localPort);transport=udp>\r\n"
         msg += "Allow: INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, INFO\r\n"
-        msg += "User-Agent: MeroSip/1.0\r\n"
+        msg += "User-Agent: Telephone/1.6 (MeroSip)\r\n"
         
         if let auth = authHeader {
             msg += "Authorization: \(auth)\r\n"
@@ -353,7 +365,6 @@ public final class RealSIPEngine: SIPServiceProtocol {
                   "c=IN IP4 \(localIP)\r\n" +
                   "t=0 0\r\n" +
                   "m=audio \(localRTP) RTP/AVP 0 8 101\r\n" +
-                  "c=IN IP4 \(localIP)\r\n" +
                   "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:8 PCMA/8000\r\n" +
                   "a=rtpmap:101 telephone-event/8000\r\n" +
@@ -372,7 +383,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         msg += "Contact: <sip:\(account.username)@\(localIP):\(localPort);transport=udp>\r\n"
         msg += "Allow: INVITE, ACK, CANCEL, OPTIONS, BYE, REFER, NOTIFY, INFO\r\n"
         msg += "Supported: replaces, timer\r\n"
-        msg += "User-Agent: MeroSip/1.0\r\n"
+        msg += "User-Agent: Telephone/1.6 (MeroSip)\r\n"
         msg += "Content-Type: application/sdp\r\n"
         msg += "Content-Length: \(sdp.utf8.count)\r\n\r\n"
         msg += sdp
@@ -398,15 +409,35 @@ public final class RealSIPEngine: SIPServiceProtocol {
         sendPacket(msg)
     }
     
-    private func sendAck(destination: String) {
+    private func sendChallengeAck(destination: String, toTag: String?) {
         guard let account = account else { return }
+        let toTagStr = (toTag != nil && !toTag!.isEmpty) ? ";tag=\(toTag!)" : ""
+        
         var msg = "ACK sip:\(destination)@\(account.domain) SIP/2.0\r\n"
         msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=z9hG4bK\(UUID().uuidString.prefix(8));rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
-        msg += "To: <sip:\(destination)@\(account.domain)>\(activeCallRemoteTag.map { ";tag=\($0)" } ?? "")\r\n"
+        msg += "To: <sip:\(destination)@\(account.domain)>\(toTagStr)\r\n"
         msg += "Call-ID: \(callIdHeader)\r\n"
         msg += "CSeq: \(cseq) ACK\r\n"
+        msg += "User-Agent: Telephone/1.6 (MeroSip)\r\n"
+        msg += "Content-Length: 0\r\n\r\n"
+        sendPacket(msg)
+    }
+    
+    private func sendAck(destination: String) {
+        guard let account = account else { return }
+        let toTag = activeCallRemoteTag?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let toTagStr = (toTag != nil && !toTag!.isEmpty) ? ";tag=\(toTag!)" : ""
+        
+        var msg = "ACK sip:\(destination)@\(account.domain) SIP/2.0\r\n"
+        msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=z9hG4bK\(UUID().uuidString.prefix(8));rport\r\n"
+        msg += "Max-Forwards: 70\r\n"
+        msg += "From: <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
+        msg += "To: <sip:\(destination)@\(account.domain)>\(toTagStr)\r\n"
+        msg += "Call-ID: \(callIdHeader)\r\n"
+        msg += "CSeq: \(cseq) ACK\r\n"
+        msg += "User-Agent: Telephone/1.6 (MeroSip)\r\n"
         msg += "Content-Length: 0\r\n\r\n"
         sendPacket(msg)
     }
@@ -458,15 +489,27 @@ public final class RealSIPEngine: SIPServiceProtocol {
     private func sendRefer(targetUri: String, destination: String) {
         guard let account = account else { return }
         cseq += 1
+        
+        let toTag = activeCallRemoteTag?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let toTagStr = (toTag != nil && !toTag!.isEmpty) ? ";tag=\(toTag!)" : ""
+        
+        let cleanTarget = targetUri.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetSip = cleanTarget.contains("@") ? cleanTarget : "\(cleanTarget)@\(account.domain)"
+        
         var msg = "REFER sip:\(destination)@\(account.domain) SIP/2.0\r\n"
         msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=z9hG4bK\(UUID().uuidString.prefix(8));rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
-        msg += "To: <sip:\(destination)@\(account.domain)>\(activeCallRemoteTag.map { ";tag=\($0)" } ?? "")\r\n"
+        msg += "To: <sip:\(destination)@\(account.domain)>\(toTagStr)\r\n"
         msg += "Call-ID: \(callIdHeader)\r\n"
         msg += "CSeq: \(cseq) REFER\r\n"
-        msg += "Refer-To: <sip:\(targetUri)@\(account.domain)>\r\n"
+        msg += "Contact: <sip:\(account.username)@\(localIP):\(localPort);transport=udp>\r\n"
+        msg += "Referred-By: <sip:\(account.username)@\(account.domain)>\r\n"
+        msg += "Refer-To: <sip:\(targetSip)>\r\n"
+        msg += "User-Agent: Telephone/1.6 (MeroSip)\r\n"
         msg += "Content-Length: 0\r\n\r\n"
+        
+        print("[SIP Engine] Sending SIP REFER to transfer call to \(targetSip)...")
         sendPacket(msg)
     }
     
@@ -495,7 +538,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
     
     private func handleIncomingSIP(_ raw: String) {
         let lines = raw.components(separatedBy: "\r\n")
-        guard let firstLine = lines.first else { return }
+        guard let firstLine = lines.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { return }
         
         print("[SIP Engine] Received: \(firstLine)")
         
@@ -527,14 +570,15 @@ public final class RealSIPEngine: SIPServiceProtocol {
                 }
             }
             
+            var challengeTag: String? = nil
             if let toLine = lines.first(where: { $0.lowercased().hasPrefix("to:") }),
                let tagPart = toLine.components(separatedBy: "tag=").last {
-                self.activeCallRemoteTag = tagPart.components(separatedBy: ";").first
+                challengeTag = tagPart.components(separatedBy: ";").first?.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             
             if method == "INVITE", let dest = activeSession?.remoteUri {
                 print("[SIP Engine] Sending ACK for 401/407 challenge on INVITE...")
-                sendAck(destination: dest)
+                sendChallengeAck(destination: dest, toTag: challengeTag)
             }
             
             handleDigestChallenge(lines: lines, method: method)
@@ -549,27 +593,34 @@ public final class RealSIPEngine: SIPServiceProtocol {
                     updateRegistrationState(.registered)
                     scheduleKeepAlive()
                 } else if cseqLine.contains("INVITE") {
-                    print("[SIP Engine] Outgoing Call Answered! 200 OK received.")
+                    print("[SIP Engine] INVITE 200 OK received.")
                     if let toLine = lines.first(where: { $0.lowercased().hasPrefix("to:") }),
                        let tagPart = toLine.components(separatedBy: "tag=").last {
-                        self.activeCallRemoteTag = tagPart.components(separatedBy: ";").first
+                        self.activeCallRemoteTag = tagPart.components(separatedBy: ";").first?.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                     
                     parseRemoteSDP(lines: lines)
                     
                     if var session = activeSession {
-                        session.state = .connected(duration: 0)
-                        session.connectTime = Date()
-                        self.activeSession = session
-                        notifySessionUpdated(session)
-                        
                         sendAck(destination: session.remoteUri)
                         
-                        let host = incomingRemoteRTPHost ?? account?.domain ?? "127.0.0.1"
-                        let port = incomingRemoteRTPPort ?? 10000
-                        RTPAudioEngine.shared.startRTP(remoteHost: host, remotePort: port)
-                        
-                        startDurationTicker(callId: session.callId)
+                        if session.connectTime == nil {
+                            // Initial call answered
+                            session.state = .connected(duration: 0)
+                            session.connectTime = Date()
+                            self.activeSession = session
+                            notifySessionUpdated(session)
+                            
+                            let host = incomingRemoteRTPHost ?? account?.domain ?? "127.0.0.1"
+                            let port = incomingRemoteRTPPort ?? 10000
+                            RTPAudioEngine.shared.startRTP(remoteHost: host, remotePort: port)
+                            
+                            startDurationTicker(callId: session.callId)
+                        } else {
+                            // In-dialog re-INVITE 200 OK (Hold / Resume)
+                            print("[SIP Engine] In-dialog re-INVITE acknowledged: Hold is \(session.isOnHold)")
+                            notifySessionUpdated(session)
+                        }
                     }
                 }
             }
@@ -602,6 +653,35 @@ public final class RealSIPEngine: SIPServiceProtocol {
                 self.activeSession = nil
                 let reason: DisconnectReason = firstLine.contains("486") ? .busy : (firstLine.contains("603") ? .declined : .failed)
                 notifySessionTerminated(session, reason: reason)
+            }
+            return
+        }
+        
+        // Handle 202 Accepted (SIP REFER Blind Transfer Accepted)
+        if firstLine.contains("202 Accepted") {
+            print("[SIP Engine] Blind Transfer accepted by PBX! Transfer in progress...")
+            return
+        }
+        
+        // Handle NOTIFY (Transfer status notifications)
+        if firstLine.hasPrefix("NOTIFY") {
+            print("[SIP Engine] Received NOTIFY event from PBX.")
+            var reply = "SIP/2.0 200 OK\r\n"
+            for via in lines.filter({ $0.lowercased().hasPrefix("via:") }) { reply += "\(via)\r\n" }
+            if let from = lines.first(where: { $0.lowercased().hasPrefix("from:") }) { reply += "\(from)\r\n" }
+            if let to = lines.first(where: { $0.lowercased().hasPrefix("to:") }) { reply += "\(to)\r\n" }
+            if let callId = lines.first(where: { $0.lowercased().hasPrefix("call-id:") }) { reply += "\(callId)\r\n" }
+            if let cseq = lines.first(where: { $0.lowercased().hasPrefix("cseq:") }) { reply += "\(cseq)\r\n" }
+            reply += "Content-Length: 0\r\n\r\n"
+            sendPacket(reply)
+            
+            if raw.contains("SIP/2.0 200 OK") || raw.contains("200 OK") {
+                print("[SIP Engine] Transferred party answered! Completing transfer and hanging up local leg.")
+                if let session = activeSession {
+                    Task {
+                        await hangupCall(callId: session.callId)
+                    }
+                }
             }
             return
         }

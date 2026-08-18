@@ -22,7 +22,8 @@ public struct InCallControlsView: View {
                 InCallButton(
                     icon: call.isMuted ? "mic.slash.fill" : "mic.fill",
                     title: call.isMuted ? "Muted" : "Mute",
-                    isActive: call.isMuted
+                    isActive: call.isMuted,
+                    activeColor: .orange
                 ) {
                     callManager.toggleMute()
                 }
@@ -46,13 +47,14 @@ public struct InCallControlsView: View {
                 }
             }
             
-            // Row 2: Hold, Transfer, Blank placeholder
+            // Row 2: Hold, Transfer
             HStack(spacing: 28) {
                 // Hold Button
                 InCallButton(
                     icon: call.isOnHold ? "play.fill" : "pause.fill",
                     title: call.isOnHold ? "Resume" : "Hold",
-                    isActive: call.isOnHold
+                    isActive: call.isOnHold,
+                    activeColor: .yellow
                 ) {
                     callManager.toggleHold()
                 }
@@ -84,30 +86,44 @@ public struct InCallControlsView: View {
     }
 }
 
-/// Circular in-call action button with label.
+/// Circular in-call action button with label and bright high-contrast dark-mode visibility.
 struct InCallButton: View {
     let icon: String
     let title: String
     let isActive: Bool
+    let activeColor: Color
     let action: () -> Void
+    
+    init(icon: String, title: String, isActive: Bool, activeColor: Color = .white, action: @escaping () -> Void) {
+        self.icon = icon
+        self.title = title
+        self.isActive = isActive
+        self.activeColor = activeColor
+        self.action = action
+    }
     
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(isActive ? Color.white : Color.secondary.opacity(0.18))
+                        .fill(isActive ? activeColor : Color.white.opacity(0.18))
                         .frame(width: 64, height: 64)
+                        .overlay(
+                            Circle()
+                                .stroke(isActive ? activeColor.opacity(0.8) : Color.white.opacity(0.3), lineWidth: 1.5)
+                        )
+                        .shadow(color: isActive ? activeColor.opacity(0.4) : Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
                     
                     Image(systemName: icon)
-                        .font(.system(size: 22))
-                        .foregroundColor(isActive ? Color.black : Color.primary)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(isActive ? (activeColor == .white ? .black : .black) : .white)
                 }
                 
                 Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(width: 72)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isActive ? (activeColor == .white ? .white : activeColor) : Color.white.opacity(0.9))
+                    .frame(width: 76)
                     .lineLimit(1)
             }
         }

@@ -1,5 +1,9 @@
 import Foundation
 import Combine
+#if os(macOS)
+import AppKit
+import UserNotifications
+#endif
 
 /// Central observable manager coordinating telephony, SIP signaling, CallKit, and call logs.
 @MainActor
@@ -34,6 +38,10 @@ public final class CallManager: ObservableObject {
         
         self.sipService.delegate = self
         self.callKitCoordinator.actionDelegate = self
+        
+        #if os(macOS)
+        requestNotificationPermission()
+        #endif
     }
     
     // MARK: - Account Registration & Provisioning
@@ -54,32 +62,37 @@ public final class CallManager: ObservableObject {
         await sipService.stop()
         self.currentUser = nil
         self.provisionedAccount = nil
+        self.registrationState = .unregistered
         self.activeCall = nil
     }
     
-    // MARK: - Outgoing & Incoming Call Actions
+    // MARK: - Telephony Actions
     
     public func startCall(to destination: String, displayName: String = "") {
-        let trimmed = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard activeCall == nil else { return }
         
         Task {
             do {
-                let session = try await sipService.makeCall(destination: trimmed, displayName: displayName)
+                let session = try await sipService.makeCall(destination: destination, displayName: displayName)
                 self.activeCall = session
-                callKitCoordinator.startOutgoingCall(uuid: session.id, handle: trimmed, displayName: session.remoteDisplayName)
+                callKitCoordinator.startOutgoingCall(uuid: session.id, handle: destination, displayName: displayName)
             } catch {
-                self.errorMessage = "Failed to start call: \(error.localizedDescription)"
+                self.errorMessage = "Call failed: \(error.localizedDescription)"
             }
         }
     }
     
     public func answerCall() {
         guard let call = activeCall else { return }
+        
+        #if os(macOS)
+        resetWindowLevel()
+        clearIncomingNotification(for: call)
+        #endif
+        
         Task {
             do {
                 try await sipService.answerCall(callId: call.callId)
-                callKitCoordinator.reportCallConnected(uuid: call.id)
             } catch {
                 self.errorMessage = "Failed to answer call: \(error.localizedDescription)"
             }
@@ -88,6 +101,12 @@ public final class CallManager: ObservableObject {
     
     public func endCall() {
         guard let call = activeCall else { return }
+        
+        #if os(macOS)
+        resetWindowLevel()
+        clearIncomingNotification(for: call)
+        #endif
+        
         Task {
             await sipService.hangupCall(callId: call.callId)
             callKitCoordinator.endCall(uuid: call.id)
@@ -97,6 +116,12 @@ public final class CallManager: ObservableObject {
     
     public func declineCall() {
         guard let call = activeCall else { return }
+        
+        #if os(macOS)
+        resetWindowLevel()
+        clearIncomingNotification(for: call)
+        #endif
+        
         Task {
             await sipService.declineCall(callId: call.callId)
             callKitCoordinator.endCall(uuid: call.id)
@@ -142,6 +167,44 @@ public final class CallManager: ObservableObject {
             }
         }
     }
+    
+    // MARK: - macOS Window Helpers
+    
+    #if os(macOS)
+    private var isAppBundle: Bool {
+        Bundle.main.bundleIdentifier != nil && Bundle.main.bundleURL.pathExtension == "app"
+    }
+    
+    private func requestNotificationPermission() {
+        guard isAppBundle else { return }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+    
+    private func postIncomingNotification(for session: CallSession) {
+        guard isAppBundle else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Incoming Call from \(session.remoteDisplayName)"
+        content.subtitle = "Ext: \(session.remoteUri)"
+        content.body = "Click to answer or manage call in MeroSip"
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: "incoming-call-\(session.id)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+    }
+    
+    private func clearIncomingNotification(for session: CallSession) {
+        guard isAppBundle else { return }
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["incoming-call-\(session.id)"])
+    }
+    
+    private func popWindowToTop() {
+        MeroSipAppDelegate.revealAndFloatMainWindow()
+        NSSound(named: "Glass")?.play()
+    }
+    
+    private func resetWindowLevel() {
+        MeroSipAppDelegate.restoreNormalWindowLevel()
+    }
+    #endif
 }
 
 // MARK: - SIPServiceDelegate
@@ -154,6 +217,11 @@ extension CallManager: SIPServiceDelegate {
     public func sipService(_ service: any SIPServiceProtocol, didReceiveIncomingCall session: CallSession) {
         self.activeCall = session
         callKitCoordinator.reportIncomingCall(uuid: session.id, handle: session.remoteUri, displayName: session.remoteDisplayName) { _ in }
+        
+        #if os(macOS)
+        popWindowToTop()
+        postIncomingNotification(for: session)
+        #endif
     }
     
     public func sipService(_ service: any SIPServiceProtocol, didUpdateCallSession session: CallSession) {
@@ -169,6 +237,12 @@ extension CallManager: SIPServiceDelegate {
             duration: session.duration,
             isMissed: isMissed
         )
+        
+        #if os(macOS)
+        resetWindowLevel()
+        clearIncomingNotification(for: session)
+        #endif
+        
         self.activeCall = nil
     }
 }
