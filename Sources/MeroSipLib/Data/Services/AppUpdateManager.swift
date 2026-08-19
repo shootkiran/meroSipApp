@@ -139,16 +139,15 @@ public final class AppUpdateManager: NSObject, ObservableObject, URLSessionDownl
         // Unzip and relaunch script
         let appBundlePath = Bundle.main.bundlePath
         let script = """
-        sleep 1
+        sleep 2
         mkdir -p /tmp/MeroSipExtracted
         rm -rf /tmp/MeroSipExtracted/*
         unzip -o "\(zipUrl.path)" -d /tmp/MeroSipExtracted
         if [ -d "/tmp/MeroSipExtracted/MeroSip.app" ]; then
             xattr -cr /tmp/MeroSipExtracted/MeroSip.app 2>/dev/null || true
             TARGET_APP="\(appBundlePath)"
-            if [ -n "$TARGET_APP" ] && [ -d "$TARGET_APP" ]; then
-                rm -rf "$TARGET_APP"
-                cp -R /tmp/MeroSipExtracted/MeroSip.app "$TARGET_APP"
+            if [ -n "$TARGET_APP" ] && [ -d "$TARGET_APP/Contents" ]; then
+                cp -Rf /tmp/MeroSipExtracted/MeroSip.app/Contents/* "$TARGET_APP/Contents/"
                 xattr -cr "$TARGET_APP" 2>/dev/null || true
                 open -n "$TARGET_APP"
             else
