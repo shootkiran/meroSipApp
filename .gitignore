@@ -5,3 +5,6 @@
 xcuserdata/
 DerivedData/
 *.tmp
+merosipbackend
+
+MeroVoip.code-workspace

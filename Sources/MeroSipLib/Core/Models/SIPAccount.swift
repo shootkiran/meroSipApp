@@ -8,12 +8,30 @@ public enum SIPTransport: String, Codable, Sendable {
 }
 
 /// Registration status of a SIP account.
-public enum RegistrationState: String, Sendable, Equatable {
-    case unconfigured = "Unconfigured"
-    case registering = "Connecting..."
-    case registered = "Online"
-    case registrationFailed = "Registration Failed"
-    case unregistered = "Offline"
+public enum RegistrationState: Sendable, Equatable {
+    case unconfigured
+    case registering
+    case registered
+    case registrationFailed
+    case retrying(seconds: Int)
+    case unregistered
+    
+    public var rawValue: String {
+        switch self {
+        case .unconfigured:
+            return "Unconfigured"
+        case .registering:
+            return "Connecting..."
+        case .registered:
+            return "Online"
+        case .registrationFailed:
+            return "Registration Failed"
+        case .retrying(let seconds):
+            return "Retrying in \(seconds)s"
+        case .unregistered:
+            return "Offline"
+        }
+    }
 }
 
 /// Provisioned SIP Account configuration.

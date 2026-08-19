@@ -242,8 +242,11 @@ public final class AppUpdateManager: NSObject, ObservableObject, URLSessionDownl
     // MARK: - Semantic Version Comparison
     
     private func isVersionNewer(_ remote: String, comparedTo local: String) -> Bool {
-        let remoteParts = remote.split(separator: ".").compactMap { Int($0) }
-        let localParts = local.split(separator: ".").compactMap { Int($0) }
+        let cleanRemote = remote.components(separatedBy: "-").first ?? remote
+        let cleanLocal = local.components(separatedBy: "-").first ?? local
+        
+        let remoteParts = cleanRemote.split(separator: ".").compactMap { Int($0.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)) }
+        let localParts = cleanLocal.split(separator: ".").compactMap { Int($0.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)) }
         
         let maxLen = max(remoteParts.count, localParts.count)
         for i in 0..<maxLen {

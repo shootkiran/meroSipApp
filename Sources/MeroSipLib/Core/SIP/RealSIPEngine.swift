@@ -38,8 +38,15 @@ public final class RealSIPEngine: SIPServiceProtocol {
     
     private var keepAliveTimer: Task<Void, Never>?
     private var durationTimer: Task<Void, Never>?
+    private var registrationTimeoutTask: Task<Void, Never>?
+    private var retryTimerTask: Task<Void, Never>?
+    private var pathMonitor: NWPathMonitor?
+    private var isPathMonitorStarted: Bool = false
+    private var registerAuthAttempts: Int = 0
     private var activeCallIdNumber: Int32 = -1
     private var activeCallRemoteTag: String?
+    private var lastInviteBranch: String?
+    private var lastInviteCSeq: Int?
     
     public init() {
         self.localPort = UInt16.random(in: 50000...65000)
@@ -48,14 +55,28 @@ public final class RealSIPEngine: SIPServiceProtocol {
     // MARK: - SIP Registration & Connection
     
     public func start(account: SIPAccount) async throws {
+        self.connection?.cancel()
+        self.connection = nil
+        
         self.account = account
         self.callIdHeader = "\(UUID().uuidString)@merosip"
         self.cseq = 1
         self.tagHeader = String(Int.random(in: 100000...999999))
         self.ncCount = 0
+        self.registerAuthAttempts = 0
+        self.localPort = UInt16.random(in: 50000...65000)
         
+        startPathMonitor()
         updateRegistrationState(.registering)
         print("[SIP Engine] Connecting to FreePBX server at \(account.proxy ?? account.domain):\(account.port)...")
+        
+        registrationTimeoutTask?.cancel()
+        registrationTimeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 12_000_000_000)
+            guard let self = self, self.registrationState == .registering else { return }
+            print("[SIP Engine] Registration timed out after 12 seconds.")
+            self.updateRegistrationState(.registrationFailed)
+        }
         
         let host = NWEndpoint.Host(account.proxy ?? account.domain)
         let port = NWEndpoint.Port(rawValue: UInt16(account.port)) ?? .init(integerLiteral: 5060)
@@ -81,11 +102,14 @@ public final class RealSIPEngine: SIPServiceProtocol {
                     }
                     self.startListening(on: conn)
                     self.sendRegister(authHeader: nil)
+                case .waiting(let error):
+                    print("[SIP Engine] Connection Waiting: \(error)")
+                    self.updateRegistrationState(.registrationFailed)
                 case .failed(let error):
                     print("[SIP Engine] Connection Failed: \(error)")
                     self.updateRegistrationState(.registrationFailed)
                 case .cancelled:
-                    self.updateRegistrationState(.unregistered)
+                    break
                 default:
                     break
                 }
@@ -96,6 +120,14 @@ public final class RealSIPEngine: SIPServiceProtocol {
     }
     
     public func stop() async {
+        retryTimerTask?.cancel()
+        retryTimerTask = nil
+        pathMonitor?.cancel()
+        pathMonitor = nil
+        isPathMonitorStarted = false
+        
+        registrationTimeoutTask?.cancel()
+        registrationTimeoutTask = nil
         keepAliveTimer?.cancel()
         keepAliveTimer = nil
         durationTimer?.cancel()
@@ -155,6 +187,8 @@ public final class RealSIPEngine: SIPServiceProtocol {
         self.callIdHeader = "\(UUID().uuidString)@merosip"
         self.tagHeader = String(Int.random(in: 100000...999999))
         self.activeCallRemoteTag = nil
+        self.lastInviteBranch = nil
+        self.lastInviteCSeq = nil
         self.cseq += 1
         
         let session = CallSession(
@@ -204,9 +238,13 @@ public final class RealSIPEngine: SIPServiceProtocol {
             sendBye(destination: session.remoteUri)
         } else {
             sendCancel(destination: session.remoteUri)
+            sendBye(destination: session.remoteUri)
         }
         
         self.activeSession = nil
+        self.lastInviteBranch = nil
+        self.lastInviteCSeq = nil
+        self.activeCallRemoteTag = nil
         notifySessionTerminated(session, reason: .normal)
     }
     
@@ -302,6 +340,9 @@ public final class RealSIPEngine: SIPServiceProtocol {
     private func sendInvite(destination: String, authHeader: String?, isHold: Bool = false) {
         guard let account = account else { return }
         cseq += 1
+        let branch = "z9hG4bK\(UUID().uuidString.prefix(8))"
+        self.lastInviteBranch = branch
+        self.lastInviteCSeq = cseq
         
         let localRTP = RTPAudioEngine.shared.localRTPPort
         let sdpMode = isHold ? "sendonly" : "sendrecv"
@@ -332,7 +373,7 @@ public final class RealSIPEngine: SIPServiceProtocol {
         }
         
         var msg = "INVITE sip:\(destination)@\(account.domain) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=z9hG4bK\(UUID().uuidString.prefix(8));rport\r\n"
+        msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=\(branch);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
         msg += "From: \"\(account.displayName)\" <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
         msg += "To: <sip:\(destination)@\(account.domain)>\(toTagStr)\r\n"
@@ -463,13 +504,21 @@ public final class RealSIPEngine: SIPServiceProtocol {
     
     private func sendCancel(destination: String) {
         guard let account = account else { return }
+        let branch = lastInviteBranch ?? "z9hG4bK\(UUID().uuidString.prefix(8))"
+        let cancelCSeq = lastInviteCSeq ?? cseq
+        
+        let toTag = activeCallRemoteTag?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let toTagStr = (toTag != nil && !toTag!.isEmpty) ? ";tag=\(toTag!)" : ""
+        
         var msg = "CANCEL sip:\(destination)@\(account.domain) SIP/2.0\r\n"
-        msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=z9hG4bK\(UUID().uuidString.prefix(8));rport\r\n"
+        msg += "Via: SIP/2.0/UDP \(localIP):\(localPort);branch=\(branch);rport\r\n"
         msg += "Max-Forwards: 70\r\n"
-        msg += "From: <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
-        msg += "To: <sip:\(destination)@\(account.domain)>\r\n"
+        msg += "From: \"\(account.displayName)\" <sip:\(account.username)@\(account.domain)>;tag=\(tagHeader)\r\n"
+        msg += "To: <sip:\(destination)@\(account.domain)>\(toTagStr)\r\n"
         msg += "Call-ID: \(callIdHeader)\r\n"
-        msg += "CSeq: \(cseq) CANCEL\r\n"
+        msg += "CSeq: \(cancelCSeq) CANCEL\r\n"
+        msg += "Reason: Q.850;cause=16;text=\"Terminated\"\r\n"
+        msg += "User-Agent: Telephone/1.6 (MeroSip)\r\n"
         msg += "Content-Length: 0\r\n\r\n"
         sendPacket(msg)
     }
@@ -562,6 +611,15 @@ public final class RealSIPEngine: SIPServiceProtocol {
                 updateRegistrationState(.registered)
             }
             return
+        }
+        
+        // Handle 403 Forbidden / 404 Not Found for Registration
+        if firstLine.contains("403") || firstLine.contains("404") {
+            if let cseqLine = lines.first(where: { $0.lowercased().hasPrefix("cseq:") }), cseqLine.contains("REGISTER") {
+                print("[SIP Engine] Registration Failed: Server returned \(firstLine)")
+                updateRegistrationState(.registrationFailed)
+                return
+            }
         }
         
         // Handle 401 / 407 Digest Challenge
@@ -793,7 +851,20 @@ public final class RealSIPEngine: SIPServiceProtocol {
     }
     
     private func handleDigestChallenge(lines: [String], method: String) {
-        guard let account = account, let password = account.password else { return }
+        guard let account = account, let password = account.password, !password.isEmpty else {
+            print("[SIP Engine] Cannot respond to digest challenge: missing or empty SIP password.")
+            updateRegistrationState(.registrationFailed)
+            return
+        }
+        
+        if method == "REGISTER" {
+            registerAuthAttempts += 1
+            if registerAuthAttempts > 2 {
+                print("[SIP Engine] Registration Failed: Repeated 401/407 challenges received. Check SIP username/password.")
+                updateRegistrationState(.registrationFailed)
+                return
+            }
+        }
         
         let authLine = lines.first(where: {
             $0.lowercased().hasPrefix("www-authenticate:") || $0.lowercased().hasPrefix("proxy-authenticate:")
@@ -920,8 +991,86 @@ public final class RealSIPEngine: SIPServiceProtocol {
     }
     
     private func updateRegistrationState(_ state: RegistrationState) {
+        if state != .registering {
+            registrationTimeoutTask?.cancel()
+            registrationTimeoutTask = nil
+        }
+        
         self.registrationState = state
         self.delegate?.sipService(self, didChangeRegistrationState: state)
+        
+        if state == .registrationFailed {
+            scheduleRetryTimer()
+        } else if state == .registered || state == .unregistered {
+            retryTimerTask?.cancel()
+            retryTimerTask = nil
+        }
+    }
+    
+    private func scheduleRetryTimer() {
+        retryTimerTask?.cancel()
+        retryTimerTask = Task { @MainActor [weak self] in
+            var countdown = 5
+            while !Task.isCancelled {
+                guard let self = self, self.account != nil else { break }
+                
+                if self.registrationState == .registered || self.registrationState == .unregistered {
+                    break
+                }
+                
+                if let monitor = self.pathMonitor, monitor.currentPath.status != .satisfied {
+                    self.updateRegistrationState(.retrying(seconds: countdown))
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    countdown -= 1
+                    if countdown <= 0 {
+                        countdown = 5
+                    }
+                    continue
+                }
+                
+                self.updateRegistrationState(.retrying(seconds: countdown))
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                countdown -= 1
+                
+                if countdown <= 0 {
+                    countdown = 5
+                    guard let account = self.account else { break }
+                    print("[SIP Engine] Retry countdown reached. Attempting SIP registration...")
+                    self.registerAuthAttempts = 0
+                    try? await self.start(account: account)
+                }
+            }
+        }
+    }
+    
+    private func startPathMonitor() {
+        guard !isPathMonitorStarted else { return }
+        isPathMonitorStarted = true
+        let monitor = NWPathMonitor()
+        self.pathMonitor = monitor
+        monitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if path.status != .satisfied {
+                    print("[SIP Engine] Network connection lost (Wi-Fi/Internet off). Transitioning to failed & retrying.")
+                    self.connection?.cancel()
+                    self.connection = nil
+                    if self.registrationState != .unregistered {
+                        self.updateRegistrationState(.registrationFailed)
+                    }
+                } else if path.status == .satisfied {
+                    print("[SIP Engine] Network connection restored.")
+                    if self.registrationState != .registered && self.registrationState != .unregistered {
+                        if let account = self.account {
+                            print("[SIP Engine] Internet re-established. Immediate SIP registration retry...")
+                            self.registerAuthAttempts = 0
+                            try? await self.start(account: account)
+                        }
+                    }
+                }
+            }
+        }
+        monitor.start(queue: .global(qos: .utility))
     }
     
     private func notifySessionUpdated(_ session: CallSession) {

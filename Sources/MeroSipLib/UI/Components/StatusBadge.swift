@@ -12,12 +12,21 @@ public struct StatusBadge: View {
         switch state {
         case .registered:
             return .green
-        case .registering:
+        case .registering, .retrying:
             return .orange
         case .registrationFailed:
             return .red
         case .unconfigured, .unregistered:
             return .gray
+        }
+    }
+    
+    private var isAnimating: Bool {
+        switch state {
+        case .registering, .retrying:
+            return true
+        default:
+            return false
         }
     }
     
@@ -28,10 +37,10 @@ public struct StatusBadge: View {
                 .frame(width: 8, height: 8)
                 .overlay(
                     Circle()
-                        .stroke(color.opacity(0.4), lineWidth: state == .registering ? 4 : 0)
-                        .scaleEffect(state == .registering ? 1.5 : 1.0)
-                        .opacity(state == .registering ? 0 : 1)
-                        .animation(state == .registering ? .easeInOut(duration: 1).repeatForever(autoreverses: false) : .default, value: state)
+                        .stroke(color.opacity(0.4), lineWidth: isAnimating ? 4 : 0)
+                        .scaleEffect(isAnimating ? 1.5 : 1.0)
+                        .opacity(isAnimating ? 0 : 1)
+                        .animation(isAnimating ? .easeInOut(duration: 1).repeatForever(autoreverses: false) : .default, value: state)
                 )
             
             Text(state.rawValue)

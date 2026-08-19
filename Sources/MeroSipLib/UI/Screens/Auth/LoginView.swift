@@ -63,6 +63,7 @@ public struct LoginView: View {
                     
                     SecureField("Enter password", text: $password)
                         .textFieldStyle(.roundedBorder)
+                        .onSubmit(handleLogin)
                 }
                 
                 if let error = errorMessage {
@@ -90,6 +91,7 @@ public struct LoginView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(.defaultAction)
                 .disabled(isLoading || email.isEmpty || password.isEmpty)
                 .opacity(email.isEmpty || password.isEmpty ? 0.6 : 1.0)
                 .padding(.top, 8)
@@ -113,6 +115,8 @@ public struct LoginView: View {
     }
     
     private func handleLogin() {
+        guard !isLoading, !email.isEmpty, !password.isEmpty else { return }
+        
         isLoading = true
         errorMessage = nil
         

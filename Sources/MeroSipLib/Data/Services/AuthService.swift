@@ -44,7 +44,7 @@ public final class AuthService: AuthServiceProtocol, @unchecked Sendable {
     private let tokenKey = "merosip.auth.jwt"
     
     public init(
-        baseUrl: URL = URL(string: "https://sipbackend.mims.top/api/v1")!,
+        baseUrl: URL = AppConfig.defaultBaseURL,
         session: URLSession = .shared,
         keychain: KeychainManager = .shared
     ) {
@@ -107,9 +107,36 @@ public final class AuthService: AuthServiceProtocol, @unchecked Sendable {
     }
     
     public func restoreSession() async -> ProvisioningResponse? {
+        guard let token = keychain.getString(key: tokenKey) else {
+            return nil
+        }
+        
+        // Refresh latest profile & SIP account credentials from backend
+        let meUrl = baseUrl.appendingPathComponent("auth/me")
+        var request = URLRequest(url: meUrl)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 5.0
+        
+        if let (data, response) = try? await session.data(for: request),
+           let http = response as? HTTPURLResponse, http.statusCode == 200 {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            if let provisioned = try? decoder.decode(ProvisioningResponse.self, from: data) {
+                let fullProvisioning = ProvisioningResponse(
+                    user: provisioned.user,
+                    sipAccount: provisioned.sipAccount,
+                    authToken: token
+                )
+                saveSession(response: fullProvisioning)
+                return fullProvisioning
+            }
+        }
+        
+        // Fallback to cached session if offline
         guard let userData = keychain.get(key: sessionUserKey),
-              let accountData = keychain.get(key: sessionAccountKey),
-              let token = keychain.getString(key: tokenKey) else {
+              let accountData = keychain.get(key: sessionAccountKey) else {
             return nil
         }
         

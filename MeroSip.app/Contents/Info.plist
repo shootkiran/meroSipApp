@@ -28,5 +28,12 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>MeroSip requires microphone access for VoIP telephony.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
 </dict>
 </plist>
