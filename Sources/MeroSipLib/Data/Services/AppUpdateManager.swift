@@ -123,41 +123,67 @@ public final class AppUpdateManager: NSObject, ObservableObject, URLSessionDownl
     }
     
     public func applyUpdateAndRelaunch() {
-        guard let zipUrl = savedUpdateZipUrl else {
+        guard let packageUrl = savedUpdateZipUrl else {
             // Dismiss if no package is present
             dismissModal()
             return
         }
         
-        print("[Auto-Update] Applying update from \(zipUrl.path)...")
+        print("[Auto-Update] Applying update from \(packageUrl.path)...")
         statusMessage = "Installing update and restarting MeroSip..."
         
         #if os(macOS)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         
-        // Unzip and relaunch script
         let appBundlePath = Bundle.main.bundlePath
-        let script = """
-        sleep 2
-        mkdir -p /tmp/MeroSipExtracted
-        rm -rf /tmp/MeroSipExtracted/*
-        unzip -o "\(zipUrl.path)" -d /tmp/MeroSipExtracted
-        if [ -d "/tmp/MeroSipExtracted/MeroSip.app" ]; then
-            xattr -cr /tmp/MeroSipExtracted/MeroSip.app 2>/dev/null || true
-            TARGET_APP="\(appBundlePath)"
-            if [ -n "$TARGET_APP" ] && [ -d "$TARGET_APP/Contents" ]; then
-                cp -Rf /tmp/MeroSipExtracted/MeroSip.app/Contents/* "$TARGET_APP/Contents/"
-                xattr -cr "$TARGET_APP" 2>/dev/null || true
-                open -n "$TARGET_APP"
-            else
-                rm -rf /Applications/MeroSip.app
-                cp -R /tmp/MeroSipExtracted/MeroSip.app /Applications/MeroSip.app
-                xattr -cr /Applications/MeroSip.app 2>/dev/null || true
-                open -n /Applications/MeroSip.app
+        let isDmg = packageUrl.pathExtension.lowercased() == "dmg"
+        
+        let script: String
+        if isDmg {
+            script = """
+            sleep 2
+            hdiutil detach /tmp/MeroSipMount 2>/dev/null || true
+            mkdir -p /tmp/MeroSipMount
+            hdiutil attach "\(packageUrl.path)" -nobrowse -mountpoint /tmp/MeroSipMount
+            if [ -d "/tmp/MeroSipMount/MeroSip.app" ]; then
+                TARGET_APP="\(appBundlePath)"
+                if [ -n "$TARGET_APP" ] && [ -d "$TARGET_APP/Contents" ]; then
+                    cp -Rf /tmp/MeroSipMount/MeroSip.app/Contents/* "$TARGET_APP/Contents/"
+                    xattr -cr "$TARGET_APP" 2>/dev/null || true
+                    hdiutil detach /tmp/MeroSipMount 2>/dev/null || true
+                    open -n "$TARGET_APP"
+                else
+                    rm -rf /Applications/MeroSip.app
+                    cp -R /tmp/MeroSipMount/MeroSip.app /Applications/MeroSip.app
+                    xattr -cr /Applications/MeroSip.app 2>/dev/null || true
+                    hdiutil detach /tmp/MeroSipMount 2>/dev/null || true
+                    open -n /Applications/MeroSip.app
+                fi
             fi
-        fi
-        """
+            """
+        } else {
+            script = """
+            sleep 2
+            mkdir -p /tmp/MeroSipExtracted
+            rm -rf /tmp/MeroSipExtracted/*
+            unzip -o "\(packageUrl.path)" -d /tmp/MeroSipExtracted
+            if [ -d "/tmp/MeroSipExtracted/MeroSip.app" ]; then
+                xattr -cr /tmp/MeroSipExtracted/MeroSip.app 2>/dev/null || true
+                TARGET_APP="\(appBundlePath)"
+                if [ -n "$TARGET_APP" ] && [ -d "$TARGET_APP/Contents" ]; then
+                    cp -Rf /tmp/MeroSipExtracted/MeroSip.app/Contents/* "$TARGET_APP/Contents/"
+                    xattr -cr "$TARGET_APP" 2>/dev/null || true
+                    open -n "$TARGET_APP"
+                else
+                    rm -rf /Applications/MeroSip.app
+                    cp -R /tmp/MeroSipExtracted/MeroSip.app /Applications/MeroSip.app
+                    xattr -cr /Applications/MeroSip.app 2>/dev/null || true
+                    open -n /Applications/MeroSip.app
+                fi
+            fi
+            """
+        }
         process.arguments = ["-c", script]
         
         do {
@@ -199,7 +225,10 @@ public final class AppUpdateManager: NSObject, ObservableObject, URLSessionDownl
     ) {
         let fileManager = FileManager.default
         let updateDir = fileManager.temporaryDirectory.appendingPathComponent("MeroSipUpdates", isDirectory: true)
-        let savedFileUrl = updateDir.appendingPathComponent("MeroSip-update-\(UUID().uuidString).zip")
+        
+        let ext = downloadTask.originalRequest?.url?.pathExtension.lowercased()
+        let fileExt = (ext == "dmg" || ext == "zip") ? ext! : "dmg"
+        let savedFileUrl = updateDir.appendingPathComponent("MeroSip-update-\(UUID().uuidString).\(fileExt)")
         
         do {
             try fileManager.createDirectory(at: updateDir, withIntermediateDirectories: true)
