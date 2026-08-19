@@ -12,7 +12,7 @@ public struct SettingsView: View {
     }
     
     public var body: some View {
-        NavigationStack {
+        NavigationView {
             Form {
                 // Profile Section
                 if let user = callManager.currentUser {
@@ -51,13 +51,13 @@ public struct SettingsView: View {
                     }
                     
                     if let account = callManager.provisionedAccount {
-                        LabeledContent("SIP Extension", value: account.username)
-                        LabeledContent("PBX Server", value: account.domain)
-                        LabeledContent("Outbound Proxy", value: account.proxy ?? account.domain)
-                        LabeledContent("Transport", value: "\(account.transport.rawValue) (Port \(account.port))")
-                        LabeledContent("SRTP Encryption", value: account.srtpEnabled ? "Enabled" : "Disabled (UDP Standard)")
+                        LabeledContentRow("SIP Extension", value: account.username)
+                        LabeledContentRow("PBX Server", value: account.domain)
+                        LabeledContentRow("Outbound Proxy", value: account.proxy ?? account.domain)
+                        LabeledContentRow("Transport", value: "\(account.transport.rawValue) (Port \(account.port))")
+                        LabeledContentRow("SRTP Encryption", value: account.srtpEnabled ? "Enabled" : "Disabled (UDP Standard)")
                         if let stun = account.stunServer {
-                            LabeledContent("STUN Server", value: stun)
+                            LabeledContentRow("STUN Server", value: stun)
                         }
                     }
                 }
@@ -76,7 +76,7 @@ public struct SettingsView: View {
                 
                 // Software Updates
                 Section("Software Updates") {
-                    LabeledContent("Installed Version", value: "v\(AppUpdateManager.shared.currentVersion) (Build \(AppUpdateManager.shared.currentBuild))")
+                    LabeledContentRow("Installed Version", value: "v\(AppUpdateManager.shared.currentVersion) (Build \(AppUpdateManager.shared.currentBuild))")
                     
                     HStack {
                         Button(action: {
@@ -120,9 +120,9 @@ public struct SettingsView: View {
                 
                 // Codecs & Telephony Info
                 Section("Telephony Engine & Codecs") {
-                    LabeledContent("SIP Stack", value: "RFC 3261 Native UDP Engine")
-                    LabeledContent("Supported Codecs", value: "PCMU (G.711u), PCMA (G.711a), Opus")
-                    LabeledContent("DTMF Mode", value: "RFC 2833 / SIP INFO")
+                    LabeledContentRow("SIP Stack", value: "RFC 3261 Native UDP Engine")
+                    LabeledContentRow("Supported Codecs", value: "PCMU (G.711u), PCMA (G.711a), Opus")
+                    LabeledContentRow("DTMF Mode", value: "RFC 2833 / SIP INFO")
                 }
                 
                 // Logout Action
@@ -151,6 +151,25 @@ public struct SettingsView: View {
             } message: {
                 Text("Signing out will disconnect extension \(callManager.provisionedAccount?.username ?? "") from the FreePBX server.")
             }
+        }
+    }
+}
+
+struct LabeledContentRow: View {
+    let title: String
+    let value: String
+    
+    init(_ title: String, value: String) {
+        self.title = title
+        self.value = value
+    }
+    
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(value)
+                .foregroundColor(.secondary)
         }
     }
 }

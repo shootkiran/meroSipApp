@@ -38,7 +38,7 @@ public struct RecentsView: View {
     }
     
     public var body: some View {
-        NavigationStack {
+        NavigationView {
             VStack(spacing: 0) {
                 // Filter Segmented Control
                 Picker("Filter", selection: $filterMode) {

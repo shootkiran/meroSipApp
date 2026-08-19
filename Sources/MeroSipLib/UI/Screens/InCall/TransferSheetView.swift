@@ -14,7 +14,7 @@ public struct TransferSheetView: View {
     }
     
     public var body: some View {
-        NavigationStack {
+        NavigationView {
             VStack(spacing: 16) {
                 Text("Transfer Call")
                     .font(.headline)

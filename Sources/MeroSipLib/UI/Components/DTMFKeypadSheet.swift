@@ -17,7 +17,7 @@ public struct DTMFKeypadSheet: View {
     ]
     
     public var body: some View {
-        NavigationStack {
+        NavigationView {
             VStack(spacing: 20) {
                 Text("In-Call DTMF Dialpad")
                     .font(.headline)

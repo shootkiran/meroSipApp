@@ -28,7 +28,7 @@ public struct ContactsView: View {
     }
     
     public var body: some View {
-        NavigationStack {
+        NavigationView {
             Group {
                 if isLoading && contacts.isEmpty {
                     ProgressView("Loading directory...")
