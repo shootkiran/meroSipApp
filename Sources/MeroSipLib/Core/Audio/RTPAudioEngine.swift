@@ -75,11 +75,19 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
         var pos = 0.0
         var maxAmp: Float = 0.0
         while Int(pos) < frameCount {
-            let rawSample = channel[Int(pos)]
-            let boosted = max(-1.0, min(1.0, rawSample * 1.3))
-            let absSample = abs(boosted)
+            let startIndex = Int(pos)
+            let endIndex = min(Int(pos + step), frameCount)
+            
+            var sum: Float = 0.0
+            let count = max(1, endIndex - startIndex)
+            for i in startIndex..<endIndex {
+                sum += channel[i]
+            }
+            let sample = sum / Float(count)
+            let clamped = max(-1.0, min(1.0, sample))
+            let absSample = abs(clamped)
             if absSample > maxAmp { maxAmp = absSample }
-            resampled.append(boosted)
+            resampled.append(clamped)
             pos += step
         }
         
@@ -468,8 +476,11 @@ public final class RTPAudioEngine: ObservableObject {
         
         let ratio = sourceSampleRate / sampleRate
         for frame in 0..<outSampleCount {
-            let inIndex = min(Int(Double(frame) * ratio), inSampleCount - 1)
-            let sample = decodedSamples[inIndex]
+            let exactPos = Double(frame) * ratio
+            let i0 = min(Int(exactPos), inSampleCount - 1)
+            let i1 = min(i0 + 1, inSampleCount - 1)
+            let frac = Float(exactPos - Double(i0))
+            let sample = (1.0 - frac) * decodedSamples[i0] + frac * decodedSamples[i1]
             for ch in 0..<Int(mixerFormat.channelCount) {
                 floatData[ch][frame] = sample
             }
