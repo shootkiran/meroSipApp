@@ -1,5 +1,5 @@
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 import Network
 
 /// Supported RTP Audio Codecs
@@ -34,8 +34,10 @@ public enum AudioCodec: UInt8, Sendable {
 /// Dedicated nonisolated audio processor running safely on CoreAudio realtime audio threads
 final class RealtimeAudioProcessor: @unchecked Sendable {
     var onEncodedRTPPacket: (@Sendable (Data) -> Void)?
+    var onMicLevelUpdate: (@Sendable (Float) -> Void)?
     var isMuted: Bool = false
     var isOnHold: Bool = false
+    var micVolume: Float = 1.0
     var codec: AudioCodec = .opus
     
     private var sequenceNumber: UInt16 = UInt16.random(in: 1...1000)
@@ -57,6 +59,9 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
     deinit {
         lock.deallocate()
     }
+    
+    private var lastInputSample: Float = 0.0
+    private var lastFilterOutput: Float = 0.0
     
     nonisolated func handleInputBuffer(_ buffer: AVAudioPCMBuffer) {
         guard let floatChannelData = buffer.floatChannelData else { return }
@@ -83,8 +88,14 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
             for i in startIndex..<endIndex {
                 sum += channel[i]
             }
-            let sample = sum / Float(count)
-            let clamped = max(-1.0, min(1.0, sample))
+            let rawSample = sum / Float(count)
+            
+            // High-Pass Filter (DC-blocker / Low-frequency hum noise filter)
+            let filteredSample = rawSample - lastInputSample + 0.995 * lastFilterOutput
+            lastInputSample = rawSample
+            lastFilterOutput = filteredSample
+            
+            let clamped = max(-1.0, min(1.0, filteredSample * micVolume))
             let absSample = abs(clamped)
             if absSample > maxAmp { maxAmp = absSample }
             resampled.append(clamped)
@@ -94,6 +105,8 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
         os_unfair_lock_lock(lock)
         if maxAmp > recentMaxVolume { recentMaxVolume = maxAmp }
         sampleBuffer.append(contentsOf: resampled)
+        
+        onMicLevelUpdate?(maxAmp)
         
         let targetFrames = codec.framesPerPacket
         while sampleBuffer.count >= targetFrames {
@@ -173,68 +186,85 @@ final class RealtimeAudioProcessor: @unchecked Sendable {
         onEncodedRTPPacket?(packet)
     }
     
+    // Pre-computed 64KB Int16 -> G.711 mu-law (PCMU) encode table
+    private static let muLawEncodeTable: [UInt8] = {
+        var table = [UInt8](repeating: 0, count: 65536)
+        for i in 0..<65536 {
+            let pcm16 = Int16(bitPattern: UInt16(i))
+            var pcm = Int(pcm16)
+            let mask: Int
+            if pcm < 0 {
+                pcm = -pcm
+                mask = 0x7F
+            } else {
+                mask = 0xFF
+            }
+            if pcm > 32635 { pcm = 32635 }
+            pcm += 0x84
+            
+            var seg = 7
+            for exp in 0..<8 {
+                if pcm <= (0x84 + (0xFF << exp)) {
+                    seg = exp
+                    break
+                }
+            }
+            let mantissa = (pcm >> (seg + 3)) & 0x0F
+            let ulaw = (seg << 4) | mantissa
+            table[i] = UInt8(ulaw ^ mask)
+        }
+        return table
+    }()
+
+    // Pre-computed 64KB Int16 -> G.711 A-law (PCMA) encode table
+    private static let aLawEncodeTable: [UInt8] = {
+        var table = [UInt8](repeating: 0, count: 65536)
+        for i in 0..<65536 {
+            let pcm16 = Int16(bitPattern: UInt16(i))
+            var pcm = Int(pcm16) >> 3
+            let mask: Int
+            if pcm >= 0 {
+                mask = 0xD5
+            } else {
+                mask = 0x55
+                pcm = ~pcm
+            }
+            if pcm > 4095 { pcm = 4095 }
+            
+            var seg = 7
+            let segLimits = [0x1F, 0x3F, 0x7F, 0xFF, 0x1FF, 0x3FF, 0x7FF, 0xFFF]
+            for s in 0..<8 {
+                if pcm <= segLimits[s] {
+                    seg = s
+                    break
+                }
+            }
+            
+            let aval: Int
+            if seg == 0 {
+                aval = (pcm >> 1) & 0x0F
+            } else {
+                aval = (seg << 4) | ((pcm >> (seg + 1)) & 0x0F)
+            }
+            table[i] = UInt8(aval ^ mask)
+        }
+        return table
+    }()
+
     /// Standard ITU-T G.711 linear to mu-law encoder
     nonisolated static func linearToMuLaw(_ sample: Float) -> UInt8 {
         let clamped = max(-1.0, min(1.0, sample))
-        var pcm = Int(clamped * 32767.0)
-        
-        let mask: Int
-        if pcm < 0 {
-            pcm = -pcm
-            mask = 0x7F
-        } else {
-            mask = 0xFF
-        }
-        
-        if pcm > 32635 { pcm = 32635 }
-        pcm += 0x84
-        
-        var exponent = 7
-        for exp in 0..<8 {
-            if pcm <= (0x84 + (0xFF << exp)) {
-                exponent = exp
-                break
-            }
-        }
-        
-        let mantissa = (pcm >> (exponent + 3)) & 0x0F
-        let ulaw = (exponent << 4) | mantissa
-        return UInt8(ulaw ^ mask)
+        let pcm16 = Int16(clamped * 32767.0)
+        let idx = Int(UInt16(bitPattern: pcm16))
+        return RealtimeAudioProcessor.muLawEncodeTable[idx]
     }
     
     /// Standard ITU-T G.711 linear to A-law encoder
     nonisolated static func linearToALaw(_ sample: Float) -> UInt8 {
         let clamped = max(-1.0, min(1.0, sample))
-        var pcm = Int(clamped * 32767.0)
-        
-        let mask: Int
-        if pcm >= 0 {
-            mask = 0xD5
-        } else {
-            mask = 0x55
-            pcm = -pcm - 1
-        }
-        
-        var seg = 8
-        for i in 0..<8 {
-            if pcm <= (0x1F << (i + 4)) {
-                seg = i
-                break
-            }
-        }
-        
-        var aval: Int
-        if seg >= 8 {
-            aval = 0x7F
-        } else {
-            aval = seg << 4
-            if seg != 0 {
-                aval |= (pcm >> (seg + 3)) & 0x0F
-            } else {
-                aval |= (pcm >> 4) & 0x0F
-            }
-        }
-        return UInt8(aval ^ mask)
+        let pcm16 = Int16(clamped * 32767.0)
+        let idx = Int(UInt16(bitPattern: pcm16))
+        return RealtimeAudioProcessor.aLawEncodeTable[idx]
     }
 }
 
@@ -252,6 +282,15 @@ public final class RTPAudioEngine: ObservableObject {
     @Published public var isOnHold: Bool = false {
         didSet { audioProcessor?.isOnHold = isOnHold }
     }
+    @Published public var speakerVolume: Float = 1.0 {
+        didSet { audioEngine?.mainMixerNode.outputVolume = speakerVolume }
+    }
+    @Published public var micVolume: Float = 1.0 {
+        didSet { audioProcessor?.micVolume = micVolume }
+    }
+    
+    @Published public private(set) var micLevel: Float = 0.0
+    @Published public private(set) var speakerLevel: Float = 0.0
     
     private var rtpConnection: NWConnection?
     public private(set) var localRTPPort: UInt16 = 40000
@@ -312,6 +351,12 @@ public final class RTPAudioEngine: ObservableObject {
             })
         }
         
+        processor.onMicLevelUpdate = { [weak self] level in
+            Task { @MainActor [weak self] in
+                self?.micLevel = level
+            }
+        }
+        
         conn.stateUpdateHandler = { [weak self] state in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
@@ -352,17 +397,16 @@ public final class RTPAudioEngine: ObservableObject {
     private func startAudioEngine() {
         let engine = AVAudioEngine()
         let player = AVAudioPlayerNode()
-        
         engine.attach(player)
         
         let mixer = engine.mainMixerNode
-        var playerFormat = mixer.outputFormat(forBus: 0)
-        if playerFormat.sampleRate == 0 {
-            playerFormat = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2) ?? playerFormat
+        var outputFormat = mixer.outputFormat(forBus: 0)
+        if outputFormat.sampleRate == 0 {
+            outputFormat = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 2) ?? outputFormat
         }
         
-        if playerFormat.sampleRate > 0 {
-            engine.connect(player, to: mixer, format: playerFormat)
+        if outputFormat.sampleRate > 0 {
+            engine.connect(player, to: mixer, format: outputFormat)
         } else {
             engine.connect(player, to: mixer, format: nil)
         }
@@ -408,6 +452,10 @@ public final class RTPAudioEngine: ObservableObject {
     
     // MARK: - RTP Receive & Speaker Playback
     
+    private var rxLpState: Float = 0.0
+    private var rxHpPrevIn: Float = 0.0
+    private var rxHpPrevOut: Float = 0.0
+    
     private func startRTPReceiver(on conn: NWConnection) {
         conn.receiveMessage { [weak self] data, _, _, _ in
             Task { @MainActor [weak self] in
@@ -421,6 +469,42 @@ public final class RTPAudioEngine: ObservableObject {
             }
         }
     }
+    
+    // Pre-computed ITU-T G.711 mu-law (PCMU) decode table
+    private static let muLawDecodeTable: [Float] = {
+        var table = [Float](repeating: 0, count: 256)
+        for i in 0..<256 {
+            let ulaw = ~i
+            let sign = (ulaw & 0x80) != 0 ? -1 : 1
+            let exponent = (ulaw >> 4) & 0x07
+            let mantissa = ulaw & 0x0F
+            let sample = sign * ((((mantissa << 3) + 0x84) << exponent) - 0x84)
+            table[i] = Float(sample) / 32768.0
+        }
+        return table
+    }()
+    
+    // Pre-computed ITU-T G.711 A-law (PCMA) decode table
+    private static let aLawDecodeTable: [Float] = {
+        var table = [Float](repeating: 0, count: 256)
+        for i in 0..<256 {
+            let aval = i ^ 0xD5
+            let sign = (aval & 0x80) != 0 ? 1 : -1
+            let exponent = (aval >> 4) & 0x07
+            let mantissa = aval & 0x0F
+            let sample: Int
+            if exponent == 0 {
+                sample = (mantissa << 4) + 8
+            } else {
+                sample = ((mantissa << 4) + 0x108) << (exponent - 1)
+            }
+            table[i] = Float(sign * sample) / 32768.0
+        }
+        return table
+    }()
+
+    private var rxPacketCount: Int = 0
+    private var rxLastReportTime: Date = Date()
     
     private func playAudioPayload(_ payload: Data, payloadType: UInt8) {
         guard let engine = audioEngine, let player = playerNode, engine.isRunning else { return }
@@ -448,7 +532,15 @@ public final class RTPAudioEngine: ObservableObject {
             payload.withUnsafeBytes { raw in
                 let bytes = raw.bindMemory(to: UInt8.self)
                 for i in 0..<payload.count {
-                    decodedSamples[i] = decodeALaw(bytes[i])
+                    let s = RTPAudioEngine.aLawDecodeTable[Int(bytes[i])]
+                    // High-pass DC blocker filter
+                    let hpOut = s - self.rxHpPrevIn + 0.95 * self.rxHpPrevOut
+                    self.rxHpPrevIn = s
+                    self.rxHpPrevOut = hpOut
+                    // Low-pass smoothing filter (cuts G.711 quantization hiss)
+                    let filtered = self.rxLpState + 0.70 * (hpOut - self.rxLpState)
+                    self.rxLpState = filtered
+                    decodedSamples[i] = filtered
                 }
             }
         } else {
@@ -458,63 +550,72 @@ public final class RTPAudioEngine: ObservableObject {
             payload.withUnsafeBytes { raw in
                 let bytes = raw.bindMemory(to: UInt8.self)
                 for i in 0..<payload.count {
-                    decodedSamples[i] = decodeMuLaw(bytes[i])
+                    let s = RTPAudioEngine.muLawDecodeTable[Int(bytes[i])]
+                    // High-pass DC blocker filter
+                    let hpOut = s - self.rxHpPrevIn + 0.95 * self.rxHpPrevOut
+                    self.rxHpPrevIn = s
+                    self.rxHpPrevOut = hpOut
+                    // Low-pass smoothing filter (cuts G.711 quantization hiss)
+                    let filtered = self.rxLpState + 0.70 * (hpOut - self.rxLpState)
+                    self.rxLpState = filtered
+                    decodedSamples[i] = filtered
                 }
             }
+        }
+        
+        rxPacketCount += 1
+        var minVal: Float = 1.0
+        var maxVal: Float = -1.0
+        var sumVal: Float = 0
+        for s in decodedSamples {
+            if s < minVal { minVal = s }
+            if s > maxVal { maxVal = s }
+            sumVal += s
+        }
+        let maxPeak = max(abs(minVal), abs(maxVal))
+        let peakLevel = maxPeak * self.speakerVolume
+        Task { @MainActor [weak self] in
+            self?.speakerLevel = peakLevel
+        }
+        
+        let now = Date()
+        if rxPacketCount % 100 == 0 || now.timeIntervalSince(rxLastReportTime) >= 3.0 {
+            rxLastReportTime = now
+            let avgVal = decodedSamples.count > 0 ? sumVal / Float(decodedSamples.count) : 0
+            print("[RTP Audio Monitor] Pkts: \(rxPacketCount), Codec: \(payloadType == 8 ? "PCMA" : "PCMU"), Min: \(String(format: "%.3f", minVal)), Max: \(String(format: "%.3f", maxVal)), Avg: \(String(format: "%.3f", avgVal)), MixerRate: \(sampleRate)Hz")
         }
         
         let inSampleCount = decodedSamples.count
         guard inSampleCount > 0 else { return }
         
-        let outSampleCount = Int(Double(inSampleCount) * (sampleRate / sourceSampleRate))
-        guard outSampleCount > 0 else { return }
+        let targetRate = sampleRate
+        let channelCount = Int(mixerFormat.channelCount)
+        guard channelCount > 0 else { return }
         
-        guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: mixerFormat, frameCapacity: AVAudioFrameCount(outSampleCount)) else { return }
-        pcmBuffer.frameLength = AVAudioFrameCount(outSampleCount)
+        let targetFrameCount = Int(Double(inSampleCount) * targetRate / sourceSampleRate)
+        guard targetFrameCount > 0,
+              let outBuffer = AVAudioPCMBuffer(pcmFormat: mixerFormat, frameCapacity: AVAudioFrameCount(targetFrameCount)) else { return }
         
-        guard let floatData = pcmBuffer.floatChannelData else { return }
+        outBuffer.frameLength = AVAudioFrameCount(targetFrameCount)
+        guard let channelData = outBuffer.floatChannelData else { return }
         
-        let ratio = sourceSampleRate / sampleRate
-        for frame in 0..<outSampleCount {
-            let exactPos = Double(frame) * ratio
-            let i0 = min(Int(exactPos), inSampleCount - 1)
-            let i1 = min(i0 + 1, inSampleCount - 1)
-            let frac = Float(exactPos - Double(i0))
-            let sample = (1.0 - frac) * decodedSamples[i0] + frac * decodedSamples[i1]
-            for ch in 0..<Int(mixerFormat.channelCount) {
-                floatData[ch][frame] = sample
+        let ratio = sourceSampleRate / targetRate
+        for ch in 0..<channelCount {
+            let ptr = channelData[ch]
+            for frame in 0..<targetFrameCount {
+                let srcPos = Double(frame) * ratio
+                let idx0 = Int(srcPos)
+                let idx1 = min(idx0 + 1, inSampleCount - 1)
+                let frac = Float(srcPos - Double(idx0))
+                let s0 = decodedSamples[idx0]
+                let s1 = decodedSamples[idx1]
+                ptr[frame] = s0 + (s1 - s0) * frac
             }
         }
         
-        player.scheduleBuffer(pcmBuffer, completionHandler: nil)
+        player.scheduleBuffer(outBuffer, completionHandler: nil)
         if !player.isPlaying {
             player.play()
         }
-    }
-    
-    /// Standard ITU-T G.711 mu-law to linear float decoder
-    private func decodeMuLaw(_ uLawByte: UInt8) -> Float {
-        let ulaw = ~Int(uLawByte)
-        let sign = (ulaw & 0x80) != 0 ? -1 : 1
-        let exponent = (ulaw >> 4) & 0x07
-        let mantissa = ulaw & 0x0F
-        let sample = sign * (((mantissa << 3) + 0x84) << exponent - 0x84)
-        return Float(sample) / 32768.0
-    }
-    
-    /// Standard ITU-T G.711 A-law to linear float decoder
-    private func decodeALaw(_ aLawByte: UInt8) -> Float {
-        let aval = Int(aLawByte ^ 0xD5)
-        let sign = (aval & 0x80) != 0 ? 1 : -1
-        let exponent = (aval >> 4) & 0x07
-        let mantissa = aval & 0x0F
-        
-        let sample: Int
-        if exponent == 0 {
-            sample = (mantissa << 4) + 8
-        } else {
-            sample = ((mantissa << 4) + 0x108) << (exponent - 1)
-        }
-        return Float(sign * sample) / 32768.0
     }
 }

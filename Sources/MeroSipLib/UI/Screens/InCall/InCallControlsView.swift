@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Control action buttons during an active call (Mute, Keypad, Audio Route, Hold, Transfer).
+/// Control action buttons during an active call (Mute, Keypad, Audio Route, Hold, Transfer, Volume Controls).
 public struct InCallControlsView: View {
     @ObservedObject var callManager: CallManager
+    @ObservedObject private var rtpAudio = RTPAudioEngine.shared
     let call: CallSession
     
     @State private var showDTMFSheet = false
@@ -16,6 +17,60 @@ public struct InCallControlsView: View {
     
     public var body: some View {
         VStack(spacing: 20) {
+            // Speaker & Microphone Volume Sliders with Live VU Meters
+            VStack(spacing: 12) {
+                VStack(spacing: 4) {
+                    HStack(spacing: 10) {
+                        Image(systemName: rtpAudio.speakerVolume == 0 ? "speaker.slash.fill" : "speaker.wave.3.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .frame(width: 20)
+                        
+                        Slider(value: $rtpAudio.speakerVolume, in: 0.0...1.0)
+                            .accentColor(.blue)
+                        
+                        Text("\(Int(rtpAudio.speakerVolume * 100))%")
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(.gray)
+                            .frame(width: 36, alignment: .trailing)
+                    }
+                    
+                    HStack(spacing: 10) {
+                        Spacer().frame(width: 20)
+                        VUMeterView(level: rtpAudio.speakerLevel)
+                        Spacer().frame(width: 36)
+                    }
+                }
+                
+                VStack(spacing: 4) {
+                    HStack(spacing: 10) {
+                        Image(systemName: rtpAudio.micVolume == 0 ? "mic.slash.fill" : "mic.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .frame(width: 20)
+                        
+                        Slider(value: $rtpAudio.micVolume, in: 0.0...1.0)
+                            .accentColor(.green)
+                        
+                        Text("\(Int(rtpAudio.micVolume * 100))%")
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundColor(.gray)
+                            .frame(width: 36, alignment: .trailing)
+                    }
+                    
+                    HStack(spacing: 10) {
+                        Spacer().frame(width: 20)
+                        VUMeterView(level: rtpAudio.micLevel)
+                        Spacer().frame(width: 36)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.white.opacity(0.08))
+            .cornerRadius(12)
+            .frame(maxWidth: 320)
+            
             // Row 1: Mute, DTMF Keypad, Audio Routing
             HStack(spacing: 28) {
                 // Mute Button
@@ -128,5 +183,30 @@ struct InCallButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Dynamic VU Level Meter Bar (Green = Good, Yellow = Loud, Red = Clipping/Too Loud)
+struct VUMeterView: View {
+    let level: Float
+    
+    private var meterColor: Color {
+        if level >= 0.85 { return .red }
+        if level >= 0.65 { return .yellow }
+        return .green
+    }
+    
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.2))
+                
+                Capsule()
+                    .fill(meterColor)
+                    .frame(width: max(2, min(geo.size.width, geo.size.width * CGFloat(level))))
+            }
+        }
+        .frame(height: 6)
     }
 }

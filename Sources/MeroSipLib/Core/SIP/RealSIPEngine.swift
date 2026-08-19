@@ -354,11 +354,11 @@ public final class RealSIPEngine: SIPServiceProtocol {
                   "s=pjmedia\r\n" +
                   "c=IN IP4 \(connIP)\r\n" +
                   "t=0 0\r\n" +
-                  "m=audio \(localRTP) RTP/AVP 111 0 8 101\r\n" +
+                  "m=audio \(localRTP) RTP/AVP 111 8 0 101\r\n" +
                   "a=rtpmap:111 opus/48000/2\r\n" +
                   "a=fmtp:111 useinbandfec=1; minptime=10\r\n" +
-                  "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:8 PCMA/8000\r\n" +
+                  "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:101 telephone-event/8000\r\n" +
                   "a=fmtp:101 0-16\r\n" +
                   "a=\(sdpMode)\r\n"
@@ -408,11 +408,11 @@ public final class RealSIPEngine: SIPServiceProtocol {
                   "s=pjmedia\r\n" +
                   "c=IN IP4 \(localIP)\r\n" +
                   "t=0 0\r\n" +
-                  "m=audio \(localRTP) RTP/AVP 111 0 8 101\r\n" +
+                  "m=audio \(localRTP) RTP/AVP 111 8 0 101\r\n" +
                   "a=rtpmap:111 opus/48000/2\r\n" +
                   "a=fmtp:111 useinbandfec=1; minptime=10\r\n" +
-                  "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:8 PCMA/8000\r\n" +
+                  "a=rtpmap:0 PCMU/8000\r\n" +
                   "a=rtpmap:101 telephone-event/8000\r\n" +
                   "a=fmtp:101 0-16\r\n" +
                   "a=sendrecv\r\n"
