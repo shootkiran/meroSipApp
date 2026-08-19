@@ -4,8 +4,8 @@ import PackageDescription
 let package = Package(
     name: "MeroSip",
     platforms: [
-        .macOS(.v14),
-        .iOS(.v17)
+        .macOS(.v13),
+        .iOS(.v16)
     ],
     products: [
         .library(

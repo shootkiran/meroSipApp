@@ -26,7 +26,7 @@ public struct TransferSheetView: View {
                         .foregroundColor(.secondary)
                     TextField("Extension or SIP URI (e.g. 1002)", text: $targetUri)
                         .textFieldStyle(.roundedBorder)
-                        .onChange(of: targetUri) { _, newValue in
+                        .onChange(of: targetUri) { newValue in
                             Task {
                                 searchResults = await contactsService.searchContacts(query: newValue)
                             }

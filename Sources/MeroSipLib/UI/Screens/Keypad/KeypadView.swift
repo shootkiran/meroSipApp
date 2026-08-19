@@ -67,7 +67,7 @@ public struct KeypadView: View {
                     .multilineTextAlignment(.center)
                     .textFieldStyle(.plain)
                     .focused($isFieldFocused)
-                    .onChange(of: dialedNumber) { _, newValue in
+                    .onChange(of: dialedNumber) { newValue in
                         // Filter out non-dialpad characters
                         let filtered = newValue.filter { "0123456789*#+ ".contains($0) }
                         if filtered != newValue {
@@ -161,11 +161,18 @@ public struct KeypadView: View {
             isFieldFocused = true
         }
         #if os(macOS)
-        .onKeyPress(.escape) {
-            dialedNumber = ""
-            matchedContact = nil
-            return .handled
-        }
+        .background(
+            Group {
+                if #available(macOS 14.0, *) {
+                    Color.clear
+                        .onKeyPress(.escape) {
+                            dialedNumber = ""
+                            matchedContact = nil
+                            return .handled
+                        }
+                }
+            }
+        )
         #endif
     }
     
